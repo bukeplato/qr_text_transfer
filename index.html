@@ -70,7 +70,7 @@
         </div>
         <div class="ctrl-group">
             <label>闪烁速度 (FPS):</label>
-            <input type="number" id="fps" value="6" min="1" max="20">
+            <input type="number" id="fps" value="20" min="1" max="60">
         </div>
         <button id="btn-send" onclick="toggleSend()">生成并循环闪烁二维码</button>
         <div id="qr-container"><div id="qrcode"></div></div>
@@ -236,7 +236,7 @@
             isScanning = true; btn.textContent = '停止扫描'; btn.classList.add('stop');
             video.onplaying = () => { scanAnimationId = requestAnimationFrame(tick); };
         } catch (err) {
-            alert("开启相机失败！请检查权限或环境。");
+            alert("开启相机失败！请确保网页运行在局域网 IP、localhost 或 HTTPS 环境下。");
         }
     }
 
