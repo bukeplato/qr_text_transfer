@@ -28,6 +28,17 @@
         .status { text-align: center; margin-top: 8px; font-size: 14px; font-weight: bold; color: #4b5563; }
         .ctrl-group { margin: 10px 0; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
         .ctrl-group input, .ctrl-group select { width: 110px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; text-align: center; font-size: 13px; }
+        #qrcode {
+            background-color: #ffffff !important; /* 强制纯白背景 */
+            padding: 15px !important;            /* 强制留出静区白边 */
+            border-radius: 8px;
+            display: inline-block;               /* 保证白边包裹紧凑 */
+            box-sizing: border-box;
+        }
+        #qrcode img, #qrcode canvas {
+            display: block;
+            background-color: #ffffff !important;
+        }
     </style>
 </head>
 <body>
@@ -103,18 +114,13 @@
         document.getElementById('qrcode').innerHTML = '';
         const levelVal = parseInt(document.getElementById('correct-level').value);
         
-        // 发送端优化1：加入白色内边距，帮助相机在闪烁时锁定定位点
-        document.getElementById('qrcode').style.padding = "10px";
-        document.getElementById('qrcode').style.background = "#ffffff";
-
         qrEncoder = new QRCode(document.getElementById("qrcode"), {
             width: 280, height: 280, 
             correctLevel: levelVal 
         });
         
         const chunkSize = parseInt(document.getElementById('chunk-size').value) || 300;
-        // 发送端优化2：闪烁默认速度降低至 4 FPS，保证液晶屏幕没有拖影
-        const fps = parseInt(document.getElementById('fps').value) || 4; 
+        const fps = parseInt(document.getElementById('fps').value) || 8; 
         
         const b64Data = btoa(encodeURIComponent(text));
         const chunks = [];
@@ -122,17 +128,39 @@
             chunks.push(b64Data.substring(i, i + chunkSize));
         }
         const total = chunks.length;
-        let current = 0;
         
+        // --- 核心优化开始：洗牌算法防死角 ---
+        let indices = Array.from({length: total}, (_, i) => i);
+        let currentIndexPointer = 0;
+
+        // 随机打乱数组顺序的函数
+        function shuffleArray(arr) {
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+        }
+        // --- 核心优化结束 ---
+
         const btn = document.getElementById('btn-send');
         btn.textContent = '停止闪烁'; btn.classList.add('stop');
 
         sendInterval = setInterval(() => {
-            // 发送端优化3：每次生成新一页前，强制清除上一页的DOM画布残留
+            // 当一轮发送完毕时
+            if (currentIndexPointer >= total) {
+                // 从第二轮开始，彻底打乱发送顺序，打破手机摄像头的频闪死角
+                shuffleArray(indices);
+                currentIndexPointer = 0;
+            }
+            
+            // 获取当前应该发送的真实页码
+            let current = indices[currentIndexPointer];
+            
             qrEncoder.clear(); 
             qrEncoder.makeCode(`${current}|${total}|${chunks[current]}`);
-            document.getElementById('send-status').textContent = `正在循环广播: 第 ${current + 1} / ${total} 页`;
-            current = (current + 1) % total;
+            document.getElementById('send-status').textContent = `正在广播: 第 ${current + 1} / ${total} 页`;
+            
+            currentIndexPointer++;
         }, 1000 / fps);
     }
 
