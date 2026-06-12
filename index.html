@@ -16,11 +16,11 @@
         .panel { display: none; }
         .panel.active { display: block; }
         textarea { width: 100%; height: 160px; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; resize: vertical; font-size: 14px; }
-        button { background: #2563eb; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; font-size: 15px; transition: background 0.2s; }
+        button { background: #2563eb; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; font-size: 15px; transition: background-color 0.2s; }
         button:hover { background: #1d4ed8; }
         button.stop { background: #dc2626; }
         button.stop:hover { background: #b91c1c; }
-        #qr-container { display: flex; justify-content: center; align-items: center; margin-top: 15px; min-height: 280px; background: #f9fafb; border-radius: 8px; border: 1px dashed #d1d5db; padding: 10px; }
+        #qr-container { display: flex; justify-content: center; align-items: center; margin-top: 15px; min-height: 280px; background: #f9fafb; border-radius: 8px; border: 1px dashed #d1d5db; padding: 20px; }
         #video-container { width: 100%; overflow: hidden; background: black; border-radius: 8px; margin-top: 15px; position: relative; }
         video { width: 100%; height: auto; display: block; }
         .progress-bar { height: 8px; background: #e5e7eb; border-radius: 4px; margin-top: 15px; overflow: hidden; }
@@ -217,11 +217,11 @@
                 if (!receivedChunks[i]) return;
                 fullB64 += receivedChunks[i];
             }
-            const originalText = decodeURIComponent(escape(atob(fullB64)));
+            const originalText = decodeURIComponent(atob(fullB64));
             document.getElementById('receive-text').value = originalText;
             document.getElementById('receive-status').textContent = '🎉 传输成功！文字已完整还原。';
             
-            // 传输成功，永久显示复制按钮，直到下一次点击“开启扫描”
+            // 传输成功，永久显示复制按钮，直到下一次点击"开启扫描"
             document.getElementById('btn-copy').style.display = 'block';
         } catch (e) {
             document.getElementById('receive-status').textContent = '解码失败，数据异常。';
