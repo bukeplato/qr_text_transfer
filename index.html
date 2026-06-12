@@ -16,7 +16,7 @@
         .panel { display: none; }
         .panel.active { display: block; }
         textarea { width: 100%; height: 160px; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; resize: vertical; font-size: 14px; }
-        button { background: #2563eb; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; font-size: 15px; transition: background-color 0.2s; }
+        button { background: #2563eb; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; font-size: 15px; transition: background 0.3s; }
         button:hover { background: #1d4ed8; }
         button.stop { background: #dc2626; }
         button.stop:hover { background: #b91c1c; }
@@ -157,23 +157,12 @@
         document.getElementById('progress-fill').style.width = '0%';
 
         try {
-           // 接收端优化1：强制请求 720p/1080p 级别的高清画质，而不是默认的模糊画质
-            videoStream = await navigator.mediaDevices.getUserMedia({ 
-                video: { 
-                    facingMode: "environment",
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
-                } 
-            });
+            videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
             video.srcObject = videoStream;
             video.setAttribute("playsinline", true);
             video.play();
             isScanning = true; btn.textContent = '停止扫描'; btn.classList.add('stop');
             scanAnimationId = requestAnimationFrame(tick);
-            // 等待视频开始播放再启动解析
-            // 以前的代码可能在调用 video.play() 之后，立刻就开始让 jsQR 去抓取画面解析。
-            // 但摄像头启动是需要时间的（可能有一两百毫秒的延迟），这时候抓到的往往是黑屏或空白帧，不仅浪费手机性能，还可能导致程序卡死。
-            video.onplaying = () => { scanAnimationId = requestAnimationFrame(tick); };
         } catch (err) {
             alert("开启相机失败！请确保网页运行在局域网 IP、localhost 或 HTTPS 环境下。");
         }
