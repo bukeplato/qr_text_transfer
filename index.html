@@ -92,7 +92,7 @@
         }
     }
 
-    // --- 发送端逻辑 ---
+    // --- 发送端逻辑优化 ---
     let sendInterval = null, qrEncoder = null;
     function toggleSend() { sendInterval ? stopSend() : startSend(); }
 
@@ -100,17 +100,21 @@
         const text = document.getElementById('send-text').value.trim();
         if (!text) { alert('请先粘贴文本！'); return; }
         
-        // 每次点击生成时，重新读取配置并初始化二维码容器
         document.getElementById('qrcode').innerHTML = '';
         const levelVal = parseInt(document.getElementById('correct-level').value);
         
+        // 发送端优化1：加入白色内边距，帮助相机在闪烁时锁定定位点
+        document.getElementById('qrcode').style.padding = "10px";
+        document.getElementById('qrcode').style.background = "#ffffff";
+
         qrEncoder = new QRCode(document.getElementById("qrcode"), {
             width: 280, height: 280, 
-            correctLevel: levelVal // 动态应用选择的容错率
+            correctLevel: levelVal 
         });
         
         const chunkSize = parseInt(document.getElementById('chunk-size').value) || 300;
-        const fps = parseInt(document.getElementById('fps').value) || 8;
+        // 发送端优化2：闪烁默认速度降低至 4 FPS，保证液晶屏幕没有拖影
+        const fps = parseInt(document.getElementById('fps').value) || 4; 
         
         const b64Data = btoa(encodeURIComponent(text));
         const chunks = [];
@@ -124,6 +128,8 @@
         btn.textContent = '停止闪烁'; btn.classList.add('stop');
 
         sendInterval = setInterval(() => {
+            // 发送端优化3：每次生成新一页前，强制清除上一页的DOM画布残留
+            qrEncoder.clear(); 
             qrEncoder.makeCode(`${current}|${total}|${chunks[current]}`);
             document.getElementById('send-status').textContent = `正在循环广播: 第 ${current + 1} / ${total} 页`;
             current = (current + 1) % total;
@@ -137,8 +143,10 @@
         document.getElementById('send-status').textContent = '已停止';
     }
 
-    // --- 接收端逻辑 ---
+    // --- 接收端逻辑优化 ---
     let videoStream = null, scanAnimationId = null, receivedChunks = {}, totalChunksCount = 0, isScanning = false;
+    let lastScanTime = 0; // 用于节流控制
+
     function toggleReceive() { isScanning ? stopReceive() : startReceive(); }
 
     async function startReceive() {
@@ -146,18 +154,25 @@
         const btn = document.getElementById('btn-receive');
         receivedChunks = {}; totalChunksCount = 0;
         document.getElementById('receive-text').value = '';
-        
-        // 开始新扫描时隐藏复制按钮，避免误触旧数据
         document.getElementById('btn-copy').style.display = 'none'; 
         document.getElementById('progress-fill').style.width = '0%';
 
         try {
-            videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            // 接收端优化1：强制请求 720p/1080p 级别的高清画质，而不是默认的模糊画质
+            videoStream = await navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                    facingMode: "environment",
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                } 
+            });
             video.srcObject = videoStream;
             video.setAttribute("playsinline", true);
             video.play();
             isScanning = true; btn.textContent = '停止扫描'; btn.classList.add('stop');
-            scanAnimationId = requestAnimationFrame(tick);
+            
+            // 等待视频开始播放再启动解析
+            video.onplaying = () => { scanAnimationId = requestAnimationFrame(tick); };
         } catch (err) {
             alert("开启相机失败！请确保网页运行在局域网 IP、localhost 或 HTTPS 环境下。");
         }
@@ -171,18 +186,33 @@
         if (scanAnimationId) { cancelAnimationFrame(scanAnimationId); scanAnimationId = null; }
     }
 
-    function tick() {
+    function tick(timestamp) {
         if (!isScanning) return;
+        
+        // 接收端优化2：性能节流！限制手机每秒最多扫 12 次 (80ms间隔)。
+        // 给手机 CPU 喘息的时间，防止卡顿导致画面拖影
+        if (timestamp - lastScanTime < 80) {
+            scanAnimationId = requestAnimationFrame(tick);
+            return;
+        }
+        lastScanTime = timestamp;
+
         const video = document.getElementById('video');
         const canvasElement = document.getElementById('canvas');
-        const canvas = canvasElement.getContext('2d');
+        // willReadFrequently 开启底层显存优化
+        const canvas = canvasElement.getContext('2d', { willReadFrequently: true });
 
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            canvasElement.height = video.videoHeight; canvasElement.width = video.videoWidth;
+            // 动态调节画布大小
+            canvasElement.height = video.videoHeight; 
+            canvasElement.width = video.videoWidth;
             canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
-            const imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
-            const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
-            if (code) { parseQRCodeData(code.data); }
+            
+            try {
+                const imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+                if (code) { parseQRCodeData(code.data); }
+            } catch(e) {}
         }
         scanAnimationId = requestAnimationFrame(tick);
     }
@@ -215,15 +245,12 @@
             const originalText = decodeURIComponent(escape(atob(fullB64)));
             document.getElementById('receive-text').value = originalText;
             document.getElementById('receive-status').textContent = '🎉 传输成功！文字已完整还原。';
-            
-            // 传输成功，永久显示复制按钮，直到下一次点击“开启扫描”
             document.getElementById('btn-copy').style.display = 'block';
         } catch (e) {
             document.getElementById('receive-status').textContent = '解码失败，数据异常。';
         }
     }
 
-    // 优化后的优雅复制体验
     function copyResult() {
         const txt = document.getElementById('receive-text');
         if (!txt.value) return;
@@ -231,14 +258,11 @@
         navigator.clipboard.writeText(txt.value).then(() => {
             const btn = document.getElementById('btn-copy');
             const originalText = btn.textContent;
-            // 改变按钮颜色和文字给予正向反馈
             btn.textContent = '✅ 复制成功！';
-            btn.style.background = '#059669'; // 深绿色
-            
-            // 1.5秒后恢复原状，不会让按钮消失，方便下次再点
+            btn.style.background = '#059669'; 
             setTimeout(() => {
                 btn.textContent = originalText;
-                btn.style.background = '#10b981'; // 恢复原来的绿色
+                btn.style.background = '#10b981'; 
             }, 1500);
         }).catch(() => {
             alert("复制失败，请手动长按文本框复制。");
