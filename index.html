@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta name="color-scheme" content="light">    <!-- 本页面只支持亮色模式 -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>大文本动态二维码免显传输工具</title>
     <script src="./qrcode.min.js"></script>
@@ -71,7 +72,7 @@
             <input type="number" id="fps" value="20" min="1" max="30">
         </div>
         <button id="btn-send" onclick="toggleSend()">生成并循环闪烁二维码</button>
-        <div id="qr-container"><div id="qrcode"></div></div>
+        <div id="qr-container"><div id="qrcode" data-darkreader-ignore></div></div>
         <div id="send-status" class="status">未开始</div>
     </div>
 
