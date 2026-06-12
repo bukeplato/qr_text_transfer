@@ -2,9 +2,9 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="color-scheme" content="light">    <!-- 本页面只支持亮色模式 -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>大文本动态二维码免显传输工具</title>
+    <meta name="color-scheme" content="light only">
+    <title>大文本动态二维码免显传输工具 (RAID5高可靠版)</title>
     <script src="./qrcode.min.js"></script>
     <script src="./jsQR.min.js"></script>
     <style>
@@ -17,11 +17,25 @@
         .panel { display: none; }
         .panel.active { display: block; }
         textarea { width: 100%; height: 160px; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; resize: vertical; font-size: 14px; }
-        button { background: #2563eb; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; font-size: 15px; transition: background-color 0.2s; }
+        button { background: #2563eb; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; font-size: 15px; transition: background 0.2s; }
         button:hover { background: #1d4ed8; }
         button.stop { background: #dc2626; }
         button.stop:hover { background: #b91c1c; }
-        #qr-container { display: flex; justify-content: center; align-items: center; margin-top: 15px; min-height: 280px; background: #f9fafb; border-radius: 8px; border: 1px dashed #d1d5db; padding: 20px; }
+        
+        /* 💡 终极对抗黑暗模式：绝对死守组件纯白背景与安全静区 */
+        #qr-container { display: flex; justify-content: center; align-items: center; margin-top: 15px; min-height: 300px; background: #f9fafb; border-radius: 8px; border: 1px dashed #d1d5db; padding: 10px; }
+        #qrcode { 
+            background-color: #ffffff !important; 
+            padding: 16px !important; 
+            border-radius: 8px; 
+            display: inline-block; 
+            box-sizing: border-box;
+            color-scheme: light !important; 
+            filter: none !important; 
+            forced-color-adjust: none !important; 
+        }
+        #qrcode img, #qrcode canvas { background-color: #ffffff !important; filter: none !important; }
+
         #video-container { width: 100%; overflow: hidden; background: black; border-radius: 8px; margin-top: 15px; position: relative; }
         video { width: 100%; height: auto; display: block; }
         .progress-bar { height: 8px; background: #e5e7eb; border-radius: 4px; margin-top: 15px; overflow: hidden; }
@@ -29,50 +43,37 @@
         .status { text-align: center; margin-top: 8px; font-size: 14px; font-weight: bold; color: #4b5563; }
         .ctrl-group { margin: 10px 0; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
         .ctrl-group input, .ctrl-group select { width: 110px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; text-align: center; font-size: 13px; }
-        #qrcode {
-            background-color: #ffffff !important; /* 强制纯白背景 */
-            padding: 15px !important;            /* 强制留出静区白边 */
-            border-radius: 8px;
-            display: inline-block;               /* 保证白边包裹紧凑 */
-            box-sizing: border-box;
-        }
-        #qrcode img, #qrcode canvas {
-            display: block;
-            background-color: #ffffff !important;
-        }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1>📋 大文本动态二维码无网传输</h1>
+    <h1>📋 大文本动态二维码传输 (RAID5 级多重防卡死版)</h1>
     <div class="tabs">
-        <div class="tab active" onclick="switchTab('send')">电脑发送端 (粘贴)</div>
-        <div class="tab" onclick="switchTab('receive')">手机接收端 (扫码)</div>
+        <div class="tab active" onclick="switchTab('send')">电脑发送端</div>
+        <div class="tab" onclick="switchTab('receive')">手机接收端</div>
     </div>
 
     <div id="panel-send" class="panel active">
-        <textarea id="send-text" placeholder="请在此处粘贴你的一万字文本..."></textarea>
-        
+        <textarea id="send-text" placeholder="请在此处粘贴需要传输的长文本..."></textarea>
         <div class="ctrl-group">
-            <label>二维码容错率 (纠错能力):</label>
+            <label>二维码容错率:</label>
             <select id="correct-level">
-                <option value="1" selected>L级 (7% 推荐，颗粒大)</option>
+                <option value="1" selected>L级 (7% 推荐，条码最稀疏)</option>
                 <option value="0">M级 (15% 均衡)</option>
                 <option value="3">Q级 (25% 较高)</option>
-                <option value="2">H级 (30% 极强，颗粒极密)</option>
+                <option value="2">H级 (30% 极强)</option>
             </select>
         </div>
-
         <div class="ctrl-group">
             <label>单页字符长度 (建议 250-350):</label>
             <input type="number" id="chunk-size" value="300" min="50" max="1000">
         </div>
         <div class="ctrl-group">
-            <label>闪烁速度 (每秒帧数 FPS):</label>
-            <input type="number" id="fps" value="20" min="1" max="30">
+            <label>闪烁速度 (FPS):</label>
+            <input type="number" id="fps" value="6" min="1" max="20">
         </div>
         <button id="btn-send" onclick="toggleSend()">生成并循环闪烁二维码</button>
-        <div id="qr-container"><div id="qrcode" data-darkreader-ignore></div></div>
+        <div id="qr-container"><div id="qrcode"></div></div>
         <div id="send-status" class="status">未开始</div>
     </div>
 
@@ -104,7 +105,38 @@
         }
     }
 
-    // --- 发送端逻辑优化 ---
+    // 💡 核心底层算法：高效安全的字符串 XOR 异或处理器 (增加边界容错)
+    function xorStrings(s1, s2) {
+        let res = "";
+        const len = Math.max(s1.length, s2.length);
+        for (let i = 0; i < len; i++) {
+            const c1 = s1.charCodeAt(i) || 0;
+            const c2 = s2.charCodeAt(i) || 0;
+            res += String.fromCharCode(c1 ^ c2);
+        }
+        return btoa(res); 
+    }
+
+    function unxorString(b64Parity, s1) {
+        let parityStr = atob(b64Parity);
+        let res = "";
+        const len = Math.max(parityStr.length, s1.length);
+        for (let i = 0; i < len; i++) {
+            const c1 = parityStr.charCodeAt(i) || 0;
+            const c2 = s1.charCodeAt(i) || 0;
+            res += String.fromCharCode(c1 ^ c2);
+        }
+        return res;
+    }
+
+    function shuffleArray(arr) {
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+    }
+
+    // --- 发送端逻辑 ---
     let sendInterval = null, qrEncoder = null;
     function toggleSend() { sendInterval ? stopSend() : startSend(); }
 
@@ -115,52 +147,60 @@
         document.getElementById('qrcode').innerHTML = '';
         const levelVal = parseInt(document.getElementById('correct-level').value);
         
-        qrEncoder = new QRCode(document.getElementById("qrcode"), {
-            width: 280, height: 280, 
-            correctLevel: levelVal 
-        });
+        qrEncoder = new QRCode(document.getElementById("qrcode"), { width: 280, height: 280, correctLevel: levelVal });
         
         const chunkSize = parseInt(document.getElementById('chunk-size').value) || 300;
-        const fps = parseInt(document.getElementById('fps').value) || 8; 
+        const fps = parseInt(document.getElementById('fps').value) || 6;
         
         const b64Data = btoa(encodeURIComponent(text));
         const chunks = [];
         for (let i = 0; i < b64Data.length; i += chunkSize) {
-            chunks.push(b64Data.substring(i, i + chunkSize));
+            let chunk = b64Data.substring(i, i + chunkSize);
+            if (chunk.length < chunkSize) { chunk = chunk.padEnd(chunkSize, ' '); }
+            chunks.push(chunk);
+        }
+        
+        // 💡 修复奇数分片漏洞：补齐偶数，确保所有数据都有 RAID5 校验保护
+        if (chunks.length % 2 !== 0) {
+            chunks.push(''.padEnd(chunkSize, ' '));
         }
         const total = chunks.length;
         
-        // --- 核心优化开始：洗牌算法防死角 ---
-        let indices = Array.from({length: total}, (_, i) => i);
-        let currentIndexPointer = 0;
-
-        // 随机打乱数组顺序的函数
-        function shuffleArray(arr) {
-            for (let i = arr.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [arr[i], arr[j]] = [arr[j], arr[i]];
-            }
+        // 构造数据集（包含原始帧 D 和 冗余校验帧 P）
+        const packets = [];
+        for (let i = 0; i < total; i++) {
+            packets.push({ type: 'D', index: i, payload: chunks[i] });
         }
-        // --- 核心优化结束 ---
+        // 每两个包生成一个交织校验包 (RAID-5 模式)
+        for (let i = 0; i < total - 1; i += 2) {
+            let parityPayload = xorStrings(chunks[i], chunks[i+1]);
+            packets.push({ type: 'P', idx1: i, idx2: i+1, payload: parityPayload });
+        }
+        
+        let indices = Array.from({length: packets.length}, (_, i) => i);
+        let currentIndexPointer = 0;
+        let isFirstRound = true; 
 
         const btn = document.getElementById('btn-send');
         btn.textContent = '停止闪烁'; btn.classList.add('stop');
 
         sendInterval = setInterval(() => {
-            // 当一轮发送完毕时
-            if (currentIndexPointer >= total) {
-                // 从第二轮开始，彻底打乱发送顺序，打破手机摄像头的频闪死角
-                shuffleArray(indices);
+            if (currentIndexPointer >= indices.length) {
+                isFirstRound = false;
+                shuffleArray(indices); 
                 currentIndexPointer = 0;
             }
             
-            // 获取当前应该发送的真实页码
-            let current = indices[currentIndexPointer];
+            let currIdx = isFirstRound ? currentIndexPointer : indices[currentIndexPointer];
+            let p = packets[currIdx];
             
-            qrEncoder.clear(); 
-            qrEncoder.makeCode(`${current}|${total}|${chunks[current]}`);
-            document.getElementById('send-status').textContent = `正在广播: 第 ${current + 1} / ${total} 页`;
-            
+            if (p.type === 'D') {
+                qrEncoder.makeCode(`${p.index}|${total}|D|${p.payload}`);
+                document.getElementById('send-status').textContent = `正在广播: 第 ${p.index + 1} / ${total} 页 [数据帧]`;
+            } else {
+                qrEncoder.makeCode(`${p.idx1},${p.idx2}|${total}|P|${p.payload}`);
+                document.getElementById('send-status').textContent = `正在广播: 第 ${p.idx1+1}-${p.idx2+1} 页 [冗余纠错帧]`;
+            }
             currentIndexPointer++;
         }, 1000 / fps);
     }
@@ -171,29 +211,32 @@
         if(btn) { btn.textContent = '生成并循环闪烁二维码'; btn.classList.remove('stop'); }
         document.getElementById('send-status').textContent = '已停止';
     }
-// --- 接收端逻辑 ---
-    let videoStream = null, scanAnimationId = null, receivedChunks = {}, totalChunksCount = 0, isScanning = false;
+
+    // --- 接收端逻辑 ---
+    let videoStream = null, scanAnimationId = null, receivedChunks = {}, receivedParity = {}, totalChunksCount = 0, isScanning = false;
+    let lastScanTime = 0;
+
     function toggleReceive() { isScanning ? stopReceive() : startReceive(); }
 
     async function startReceive() {
         const video = document.getElementById('video');
         const btn = document.getElementById('btn-receive');
-        receivedChunks = {}; totalChunksCount = 0;
+        receivedChunks = {}; receivedParity = {}; totalChunksCount = 0;
         document.getElementById('receive-text').value = '';
-        
-        // 开始新扫描时隐藏复制按钮，避免误触旧数据
         document.getElementById('btn-copy').style.display = 'none'; 
         document.getElementById('progress-fill').style.width = '0%';
 
         try {
-            videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            videoStream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } } 
+            });
             video.srcObject = videoStream;
             video.setAttribute("playsinline", true);
             video.play();
             isScanning = true; btn.textContent = '停止扫描'; btn.classList.add('stop');
-            scanAnimationId = requestAnimationFrame(tick);
+            video.onplaying = () => { scanAnimationId = requestAnimationFrame(tick); };
         } catch (err) {
-            alert("开启相机失败！请确保网页运行在局域网 IP、localhost 或 HTTPS 环境下。");
+            alert("开启相机失败！请检查权限或环境。");
         }
     }
 
@@ -205,37 +248,78 @@
         if (scanAnimationId) { cancelAnimationFrame(scanAnimationId); scanAnimationId = null; }
     }
 
-    function tick() {
+    function tick(timestamp) {
         if (!isScanning) return;
+        if (timestamp - lastScanTime < 70) { 
+            scanAnimationId = requestAnimationFrame(tick);
+            return;
+        }
+        lastScanTime = timestamp;
+
         const video = document.getElementById('video');
         const canvasElement = document.getElementById('canvas');
-        const canvas = canvasElement.getContext('2d');
+        const ctx = canvasElement.getContext('2d', { willReadFrequently: true });
 
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
             canvasElement.height = video.videoHeight; canvasElement.width = video.videoWidth;
-            canvas.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
-            const imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
-            const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
-            if (code) { parseQRCodeData(code.data); }
+            ctx.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+            try {
+                const imageData = ctx.getImageData(0, 0, canvasElement.width, canvasElement.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+                if (code) { parseQRCodeData(code.data); }
+            } catch(e) {}
         }
         scanAnimationId = requestAnimationFrame(tick);
     }
 
     function parseQRCodeData(rawData) {
         const parts = rawData.split('|');
-        if (parts.length !== 3) return;
-        const index = parseInt(parts[0]), total = parseInt(parts[1]), payload = parts[2];
-        if (isNaN(index) || isNaN(total)) return;
+        if (parts.length !== 4) return;
+        const idStr = parts[0], total = parseInt(parts[1]), type = parts[2], payload = parts[3];
+        if (isNaN(total)) return;
 
         if (totalChunksCount === 0) { totalChunksCount = total; }
-        if (!receivedChunks[index]) {
-            receivedChunks[index] = payload;
-            const receivedCount = Object.keys(receivedChunks).length;
-            const percent = (receivedCount / totalChunksCount) * 100;
-            document.getElementById('progress-fill').style.width = percent + '%';
-            document.getElementById('receive-status').textContent = `正在拼凑碎片: ${receivedCount} / ${totalChunksCount}`;
-            if (receivedCount === totalChunksCount) { assembleAndDisplay(); }
+        
+        if (type === 'D') {
+            const index = parseInt(idStr);
+            if (!receivedChunks[index]) {
+                receivedChunks[index] = payload;
+                checkParityRecovery();
+                updateProgress();
+            }
+        } else if (type === 'P') {
+            if (!receivedParity[idStr]) {
+                receivedParity[idStr] = payload;
+                checkParityRecovery();
+                updateProgress();
+            }
         }
+    }
+
+    function checkParityRecovery() {
+        for (let i = 0; i < totalChunksCount - 1; i += 2) {
+            let key = `${i},${i+1}`;
+            let hasD1 = !!receivedChunks[i];
+            let hasD2 = !!receivedChunks[i+1];
+            let hasP = !!receivedParity[key];
+            
+            if (hasP) {
+                if (hasD1 && !hasD2) {
+                    receivedChunks[i+1] = unxorString(receivedParity[key], receivedChunks[i]);
+                } 
+                else if (!hasD1 && hasD2) {
+                    receivedChunks[i] = unxorString(receivedParity[key], receivedChunks[i+1]);
+                }
+            }
+        }
+    }
+
+    function updateProgress() {
+        const receivedCount = Object.keys(receivedChunks).length;
+        const percent = (receivedCount / totalChunksCount) * 100;
+        document.getElementById('progress-fill').style.width = percent + '%';
+        document.getElementById('receive-status').textContent = `正在拼凑碎片: ${receivedCount} / ${totalChunksCount} (含冗余算法实时补全)`;
+        if (receivedCount === totalChunksCount) { assembleAndDisplay(); }
     }
 
     function assembleAndDisplay() {
@@ -244,20 +328,18 @@
             let fullB64 = '';
             for (let i = 0; i < totalChunksCount; i++) {
                 if (!receivedChunks[i]) return;
-                fullB64 += receivedChunks[i];
+                fullB64 += receivedChunks[i].trim(); 
             }
+            // 💡 修复致命Bug：移除多余的 escape()，直接解码 URL 编码的 Base64
             const originalText = decodeURIComponent(atob(fullB64));
             document.getElementById('receive-text').value = originalText;
-            document.getElementById('receive-status').textContent = '🎉 传输成功！文字已完整还原。';
-            
-            // 传输成功，永久显示复制按钮，直到下一次点击"开启扫描"
+            document.getElementById('receive-status').textContent = '🎉 传输成功！文字已完美无损还原。';
             document.getElementById('btn-copy').style.display = 'block';
         } catch (e) {
-            document.getElementById('receive-status').textContent = '解码失败，数据异常。';
+            document.getElementById('receive-status').textContent = '还原失败，Base64校验异常。';
         }
     }
 
-    // 优化后的优雅复制体验
     function copyResult() {
         const txt = document.getElementById('receive-text');
         if (!txt.value) return;
@@ -265,18 +347,10 @@
         navigator.clipboard.writeText(txt.value).then(() => {
             const btn = document.getElementById('btn-copy');
             const originalText = btn.textContent;
-            // 改变按钮颜色和文字给予正向反馈
             btn.textContent = '✅ 复制成功！';
-            btn.style.background = '#059669'; // 深绿色
-            
-            // 1.5秒后恢复原状，不会让按钮消失，方便下次再点
-            setTimeout(() => {
-                btn.textContent = originalText;
-                btn.style.background = '#10b981'; // 恢复原来的绿色
-            }, 1500);
-        }).catch(() => {
-            alert("复制失败，请手动长按文本框复制。");
-        });
+            btn.style.background = '#059669'; 
+            setTimeout(() => { btn.textContent = originalText; btn.style.background = '#10b981'; }, 1500);
+        }).catch(() => { alert("复制失败，请手动全选复制。"); });
     }
 </script>
 </body>
