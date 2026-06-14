@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light only">
-    <title>大文本动态二维码传输 (高配硬件实时版)</title>
+    <title>大文本动态二维码传输</title>
     <script src="./qrcode.min.js"></script>
     <script src="./jsQR.min.js"></script>
     <style>
@@ -22,7 +22,6 @@
         button.stop { background: #dc2626; }
         button.stop:hover { background: #b91c1c; }
         
-        /* 终极对抗黑暗模式：绝对死守组件纯白背景与安全静区 */
         #qr-container { display: flex; justify-content: center; align-items: center; margin-top: 15px; min-height: 300px; background: #f9fafb; border-radius: 8px; border: 1px dashed #d1d5db; padding: 10px; }
         #qrcode { 
             background-color: #ffffff !important; 
@@ -47,7 +46,7 @@
 </head>
 <body>
 <div class="container">
-    <h1>🚀 动态二维码传输 (高配实时极速版)</h1>
+    <h1>🚀 动态二维码传输 (高配硬件防共振版)</h1>
     <div class="tabs">
         <div class="tab active" onclick="switchTab('send')">电脑发送端</div>
         <div class="tab" onclick="switchTab('receive')">手机接收端</div>
@@ -55,7 +54,6 @@
 
     <div id="panel-send" class="panel active">
         <textarea id="send-text" placeholder="请在此处粘贴需要传输的长文本..."></textarea>
-        
         <div class="ctrl-group">
             <label>二维码容错率:</label>
             <select id="correct-level">
@@ -66,7 +64,7 @@
             </select>
         </div>
         <div class="ctrl-group">
-            <label>单页字符 (推荐 200-300):</label>
+            <label>单页字符 (推荐 250-300):</label>
             <input type="number" id="chunk-size" value="250" min="50" max="800">
         </div>
         <div class="ctrl-group">
@@ -87,11 +85,11 @@
         <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
         <div id="receive-status" class="status">等待开始...</div>
         <textarea id="receive-text" placeholder="接收完成后，完整文本会直接显示在这里..." readonly style="margin-top:15px; background:#f9fafb; height: 180px;"></textarea>
+        <button id="btn-copy" onclick="copyResult()" style="background:#10b981; display:none;">一键复制完整文本</button>
     </div>
 </div>
 
 <script>
-    // --- 防止息屏 API ---
     let wakeLock = null;
     async function keepAwake() {
         try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
@@ -114,8 +112,17 @@
         }
     }
 
+    // 💡 修复乱码核心 1：严格的 UTF-8 转 Base64（避免单汉字膨胀 3 倍的问题）
+    function utf8ToBase64(str) {
+        return btoa(unescape(encodeURIComponent(str)));
+    }
+    // 💡 修复乱码核心 2：Base64 还原为正规 UTF-8 文本
+    function base64ToUtf8(str) {
+        return decodeURIComponent(escape(atob(str)));
+    }
+
     // ==========================================
-    // 发送端：暴力实时渲染 (零等待，秒开)
+    // 发送端：带轻量级抗共振洗牌的实时引擎
     // ==========================================
     let isSending = false;
     let sendInterval = null;
@@ -134,41 +141,58 @@
         const btn = document.getElementById('btn-send');
         const statusEl = document.getElementById('send-status');
         
-        // 1. 数据切片
         const chunkSize = parseInt(document.getElementById('chunk-size').value) || 250;
-        const b64Data = btoa(encodeURIComponent(text));
+        
+        // 使用正确的压缩法，使得二维码体积大幅减小
+        const b64Data = utf8ToBase64(text);
         const chunks = [];
         for (let i = 0; i < b64Data.length; i += chunkSize) {
             chunks.push(b64Data.substring(i, i + chunkSize));
         }
         const total = chunks.length;
 
-        // 2. 初始化二维码对象 (获取你的容错率挡位)
         document.getElementById('qrcode').innerHTML = '';
         const levelVal = parseInt(document.getElementById('correct-level').value);
         qrEncoder = new QRCode(document.getElementById("qrcode"), { 
-            width: 320,  // 放大一点，保证高容错率时像素点不模糊
+            width: 320,  
             height: 320, 
             correctLevel: levelVal 
         });
 
-        // 3. 启动实时高频轮询 (不再预渲染，依靠高配电脑实时计算)
         isSending = true;
-        let currentFrameIndex = 0;
         btn.textContent = '⏹ 停止闪烁';
         btn.classList.add('stop');
         
         const fps = parseInt(document.getElementById('fps').value) || 15;
         const frameDuration = 1000 / fps;
 
+        // 生成初始顺序数组
+        let indices = Array.from({length: total}, (_, i) => i);
+        let pointer = 0;
+        let isFirstRound = true;
+
         sendInterval = setInterval(() => {
-            // 格式： 索引|总数|真实数据
+            // 当一轮播放完毕时
+            if (pointer >= total) {
+                pointer = 0;
+                isFirstRound = false;
+                // 💡 破解最后2-3张卡顿：从第二轮开始，用 0.1 毫秒极速打乱数组，彻底击碎屏幕与镜头的刷新率共振死角
+                for (let i = indices.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [indices[i], indices[j]] = [indices[j], indices[i]];
+                }
+            }
+
+            let currentFrameIndex = indices[pointer];
             let payload = `${currentFrameIndex}|${total}|${chunks[currentFrameIndex]}`;
+            
             qrEncoder.clear();
             qrEncoder.makeCode(payload);
             
-            statusEl.textContent = `实时极速广播: 第 ${currentFrameIndex + 1} / ${total} 页`;
-            currentFrameIndex = (currentFrameIndex + 1) % total;
+            let roundText = isFirstRound ? "顺序广播" : "防共振补漏广播";
+            statusEl.textContent = `⚡ [${roundText}] 第 ${currentFrameIndex + 1} / ${total} 页`;
+            
+            pointer++;
         }, frameDuration);
     }
 
@@ -183,15 +207,14 @@
     }
 
     // ==========================================
-    // 接收端：原生极速引擎 (无校验负担，纯拼手速)
+    // 接收端：极速解析
     // ==========================================
     let isReceiving = false;
     let videoStream = null;
     let receiveAnimationId = null;
-    let receivedMap = new Map(); // 使用 Map 追求最高效管理
+    let receivedMap = new Map(); 
     let totalChunksCount = 0;
     
-    // 提速核心：即使在 M 或 H 容错率下，600px 足以让 jsQR 精准识别，同时极大减轻 CPU 负担
     const SCAN_MAX_WIDTH = 600; 
 
     async function toggleReceive() {
@@ -206,6 +229,7 @@
         receivedMap.clear();
         totalChunksCount = 0;
         document.getElementById('receive-text').value = '';
+        document.getElementById('btn-copy').style.display = 'none';
         document.getElementById('progress-fill').style.width = '0%';
         keepAwake();
 
@@ -246,7 +270,6 @@
         const ctx = canvasElement.getContext('2d', { willReadFrequently: true });
 
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            // 画布按比例压缩到 600px 宽度
             const scale = Math.min(1, SCAN_MAX_WIDTH / video.videoWidth);
             canvasElement.width = video.videoWidth * scale;
             canvasElement.height = video.videoHeight * scale;
@@ -254,14 +277,12 @@
             ctx.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
             try {
                 const imageData = ctx.getImageData(0, 0, canvasElement.width, canvasElement.height);
-                // 关闭强制翻转可节省一倍的运算量 (我们已经保证了白底黑码)
                 const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
                 if (code && code.data) {
                     processQRCodeFast(code.data);
                 }
             } catch(e) {}
         }
-        // iPhone 性能足够，我们不再人为锁定频率，直接放开让 RAF 满载奔跑
         receiveAnimationId = requestAnimationFrame(scanTick);
     }
 
@@ -293,17 +314,32 @@
     function finishTransfer() {
         stopReceive();
         try {
-            // 将 Map 转回有序数组并合并
             let fullB64 = '';
             for (let i = 0; i < totalChunksCount; i++) {
                 fullB64 += receivedMap.get(i);
             }
-            const originalText = decodeURIComponent(escape(atob(fullB64)));
+            // 💡 应用正确的还原解码器
+            const originalText = base64ToUtf8(fullB64);
+            
             document.getElementById('receive-text').value = originalText;
-            document.getElementById('receive-status').textContent = '🎉 接收完成！';
+            document.getElementById('receive-status').textContent = '🎉 传输成功！文字已无损还原。';
+            document.getElementById('btn-copy').style.display = 'block';
         } catch (e) {
-            document.getElementById('receive-status').textContent = '❌ 数据解析失败';
+            document.getElementById('receive-status').textContent = '❌ 数据还原失败，请重试。';
         }
+    }
+
+    function copyResult() {
+        const txt = document.getElementById('receive-text');
+        if (!txt.value) return;
+        txt.select();
+        navigator.clipboard.writeText(txt.value).then(() => {
+            const btn = document.getElementById('btn-copy');
+            const originalText = btn.textContent;
+            btn.textContent = '✅ 复制成功！';
+            btn.style.background = '#059669'; 
+            setTimeout(() => { btn.textContent = originalText; btn.style.background = '#10b981'; }, 1500);
+        }).catch(() => { alert("复制失败，请手动全选复制。"); });
     }
 </script>
 </body>
