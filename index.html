@@ -5,65 +5,123 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light only">
     <title>极速动态二维码传输 (暴力性能版)</title>
+    <!-- 保持原有依赖 -->
     <script src="./qrcode.min.js"></script>
     <script src="./jsQR.min.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f3f4f6; margin: 0; padding: 15px; color: #1f2937; }
-        .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-        h1 { font-size: 20px; text-align: center; margin-bottom: 20px; color: #111827; margin-top:0; }
-        .tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; }
-        .tab { flex: 1; text-align: center; padding: 12px; cursor: pointer; font-weight: bold; color: #6b7280; }
-        .tab.active { color: #2563eb; border-bottom: 2px solid #2563eb; margin-bottom: -2px; }
-        .panel { display: none; }
-        .panel.active { display: block; }
-        textarea { width: 100%; height: 160px; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; resize: vertical; font-size: 14px; }
-        button { background: #2563eb; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; font-size: 15px; transition: background 0.2s; }
-        button:hover { background: #1d4ed8; }
-        button.stop { background: #dc2626; }
-        button.stop:hover { background: #b91c1c; }
-        
-        /* 二维码展示区：强制白边，抗暗黑模式 */
-        #qr-container { display: flex; justify-content: center; align-items: center; margin-top: 15px; min-height: 300px; background: #f9fafb; border-radius: 8px; border: 1px dashed #d1d5db; padding: 10px; }
-        #fast-qr-display { 
-            background-color: #ffffff !important; 
-            padding: 20px !important; 
-            border-radius: 8px; 
-            display: block; 
-            box-sizing: border-box;
-            color-scheme: light !important; 
-            max-width: 100%;
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --danger: #dc2626;
+            --success: #10b981;
+            --bg: #f3f4f6;
+            --card-bg: #ffffff;
+            --text: #1f2937;
+            --text-secondary: #6b7280;
+            --border: #e5e7eb;
         }
 
-        #video-container { width: 100%; overflow: hidden; background: black; border-radius: 8px; margin-top: 15px; position: relative; }
-        video { width: 100%; height: auto; display: block; }
-        .progress-bar { height: 8px; background: #e5e7eb; border-radius: 4px; margin-top: 15px; overflow: hidden; }
-        .progress-fill { height: 100%; background: #10b981; width: 0%; transition: width 0.1s; }
-        .status { text-align: center; margin-top: 8px; font-size: 14px; font-weight: bold; color: #4b5563; }
-        .ctrl-group { margin: 10px 0; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
-        .ctrl-group input { width: 110px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; text-align: center; font-size: 13px; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            background: var(--bg); margin: 0; padding: 15px; color: var(--text); 
+            -webkit-font-smoothing: antialiased;
+        }
+        .container { 
+            max-width: 600px; margin: 0 auto; background: var(--card-bg); 
+            padding: 24px; border-radius: 16px; box-shadow: 0 10px 30px -5px rgba(0,0,0,0.1); 
+        }
+        h1 { font-size: 22px; text-align: center; margin-bottom: 24px; color: #111827; margin-top:0; letter-spacing: -0.5px; }
+        
+        .tabs { display: flex; margin-bottom: 24px; background: #f1f5f9; padding: 4px; border-radius: 10px; }
+        .tab { 
+            flex: 1; text-align: center; padding: 10px; cursor: pointer; font-weight: 600; 
+            color: var(--text-secondary); border-radius: 8px; transition: all 0.2s; font-size: 14px;
+        }
+        .tab.active { 
+            color: var(--primary); background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.05); 
+        }
+        .panel { display: none; animation: fadeIn 0.3s ease; }
+        .panel.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        textarea { 
+            width: 100%; height: 140px; padding: 12px; border: 1px solid var(--border); 
+            border-radius: 8px; box-sizing: border-box; resize: vertical; font-size: 14px; 
+            font-family: inherit; transition: border-color 0.2s;
+        }
+        textarea:focus { outline: none; border-color: var(--primary); }
+        
+        button { 
+            background: var(--primary); color: white; border: none; padding: 14px 20px; 
+            border-radius: 10px; cursor: pointer; font-weight: 600; width: 100%; margin-top: 12px; 
+            font-size: 15px; transition: all 0.2s; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+        }
+        button:hover { background: var(--primary-hover); transform: translateY(-1px); }
+        button:active { transform: translateY(0); }
+        button.stop { background: var(--danger); box-shadow: 0 4px 6px -1px rgba(220, 38, 38, 0.2); }
+        button.stop:hover { background: #b91c1c; }
+        button.ghost { background: #f1f5f9; color: var(--text); box-shadow: none; border: 1px solid var(--border); }
+        button.ghost:hover { background: #e2e8f0; }
+        button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        
+        /* 二维码展示区：强制纯白背景，保证安静区(Quiet Zone) */
+        #qr-container { 
+            display: flex; justify-content: center; align-items: center; margin-top: 20px; 
+            min-height: 320px; background: #f8fafc; border-radius: 12px; border: 1px dashed var(--border); padding: 20px; 
+        }
+        .qr-wrapper {
+            background: #ffffff !important;
+            padding: 20px !important;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            display: inline-block;
+            color-scheme: light !important;
+        }
+        #fast-qr-display { display: block; }
+
+        #video-container { 
+            width: 100%; overflow: hidden; background: #000; border-radius: 12px; 
+            margin-top: 15px; position: relative; aspect-ratio: 4/3;
+        }
+        video { width: 100%; height: 100%; object-fit: cover; display: block; }
+        
+        .progress-bar { height: 10px; background: #e2e8f0; border-radius: 5px; margin-top: 15px; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #10b981, #34d399); width: 0%; transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+        
+        .status { text-align: center; margin-top: 10px; font-size: 13px; font-weight: 600; color: var(--text-secondary); min-height: 20px; }
+        .ctrl-group { margin: 12px 0; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+        .ctrl-group label { color: var(--text-secondary); font-weight: 500; }
+        .ctrl-group input { 
+            width: 90px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; 
+            text-align: center; font-size: 14px; font-weight: 600;
+        }
+        .action-row { display: flex; gap: 10px; margin-top: 12px; }
+        .action-row button { flex: 1; margin-top: 0; }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1>🚀 极速动态二维码传输 (性能暴走版)</h1>
+    <h1>🚀 极速动态二维码传输</h1>
     <div class="tabs">
-        <div class="tab active" onclick="switchTab('send')">电脑极速发送</div>
-        <div class="tab" onclick="switchTab('receive')">手机极速接收</div>
+        <div class="tab active" onclick="switchTab('send')">💻 电脑发送</div>
+        <div class="tab" onclick="switchTab('receive')">📱 手机接收</div>
     </div>
 
     <div id="panel-send" class="panel active">
-        <textarea id="send-text" placeholder="请在此处粘贴需要传输的长文本..."></textarea>
+        <textarea id="send-text" placeholder="请在此处粘贴需要传输的长文本 (支持中文)..."></textarea>
         <div class="ctrl-group">
-            <label>单页字符 (推荐 200，识别最快):</label>
-            <input type="number" id="chunk-size" value="200" min="50" max="800">
+            <label>单页字符 (推荐 200):</label>
+            <input type="number" id="chunk-size" value="200" min="50" max="1500">
         </div>
         <div class="ctrl-group">
-            <label>闪烁速度 (FPS，最高可达30):</label>
-            <input type="number" id="fps" value="15" min="1" max="60">
+            <label>闪烁速度 (FPS):</label>
+            <input type="number" id="fps" value="15" min="1" max="30">
         </div>
         <button id="btn-send" onclick="toggleSend()">🚀 渲染并开始极限闪烁</button>
         <div id="qr-container">
-            <img id="fast-qr-display" src="" style="display:none;" />
+            <div class="qr-wrapper" style="display:none;">
+                <canvas id="fast-qr-display" width="300" height="300"></canvas>
+            </div>
         </div>
         <div id="send-status" class="status">未开始</div>
     </div>
@@ -71,25 +129,40 @@
     <div id="panel-receive" class="panel">
         <button id="btn-receive" onclick="toggleReceive()">📸 开启极速扫描</button>
         <div id="video-container">
-            <video id="video" playsinline></video>
+            <video id="video" playsinline muted></video>
             <canvas id="canvas" style="display:none;"></canvas>
         </div>
         <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
         <div id="receive-status" class="status">等待开始...</div>
-        <textarea id="receive-text" placeholder="接收完成后，完整文本会直接显示在这里..." readonly style="margin-top:15px; background:#f9fafb; height: 180px;"></textarea>
+        <textarea id="receive-text" placeholder="接收完成后，完整文本会直接显示在这里..." readonly style="margin-top:15px; background:#f8fafc; height: 160px;"></textarea>
+        <div class="action-row" id="finish-actions" style="display:none;">
+            <button class="ghost" onclick="forceFinish()">⚠️ 强制完成 (漏包)</button>
+            <button onclick="clearReceive()">🗑️ 清空并重试</button>
+        </div>
     </div>
 </div>
 
-<div id="hidden-qr-generator" style="display:none;"></div>
-
 <script>
+    // ==========================================
+    // 核心工具函数：高性能 UTF-8 Base64 编解码
+    // 彻底解决中文转 encodeURIComponent 后体积膨胀 3 倍的致命问题
+    // ==========================================
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+    function toBase64(str) {
+        return btoa(String.fromCharCode(...encoder.encode(str)));
+    }
+    function fromBase64(b64) {
+        return decoder.decode(Uint8Array.from(atob(b64), c => c.charCodeAt(0)));
+    }
+
     // --- 防止息屏 API ---
     let wakeLock = null;
     async function keepAwake() {
         try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
     }
     function releaseAwake() {
-        if (wakeLock !== null) wakeLock.release().then(() => wakeLock = null);
+        if (wakeLock !== null) { wakeLock.release().then(() => wakeLock = null); }
     }
 
     function switchTab(type) {
@@ -107,76 +180,90 @@
     }
 
     // ==========================================
-    // 发送端：预渲染 + RequestAnimationFrame 引擎
+    // 发送端：Canvas 直绘 + 批量预渲染引擎
     // ==========================================
     let isSending = false;
-    let preRenderedImages = []; // 缓存在内存中的图片 DataURL
+    let preRenderedCanvases = []; // 直接缓存 Canvas 节点，性能碾压 Image Base64
     let currentFrameIndex = 0;
     let lastRenderTime = 0;
     let sendAnimationId = null;
+    let totalFrames = 0;
 
     async function toggleSend() {
-        if (isSending) {
-            stopSend();
-        } else {
-            await startSend();
-        }
+        if (isSending) stopSend();
+        else await startSend();
     }
 
     async function startSend() {
         const text = document.getElementById('send-text').value.trim();
-        if (!text) { alert('请先粘贴文本！'); return; }
+        if (!text) { alert('请先输入文本！'); return; }
 
         keepAwake();
         const btn = document.getElementById('btn-send');
         const statusEl = document.getElementById('send-status');
-        const displayImg = document.getElementById('fast-qr-display');
+        const qrWrapper = document.querySelector('.qr-wrapper');
+        const displayCanvas = document.getElementById('fast-qr-display');
+        const ctx = displayCanvas.getContext('2d');
         
-        btn.textContent = '⏳ 正在预渲染二维码内存...';
+        btn.textContent = '⏳ 正在暴力预渲染内存...';
         btn.disabled = true;
         statusEl.textContent = "准备数据中，请稍候...";
 
-        // 1. 数据切片 (放弃冗余，采用轻量级 Base64 保证兼容)
         const chunkSize = parseInt(document.getElementById('chunk-size').value) || 200;
-        const b64Data = btoa(encodeURIComponent(text));
+        const b64Data = toBase64(text);
         const chunks = [];
         for (let i = 0; i < b64Data.length; i += chunkSize) {
             chunks.push(b64Data.substring(i, i + chunkSize));
         }
-        const total = chunks.length;
+        totalFrames = chunks.length;
 
-        // 2. 暴力预渲染机制 (将所有二维码提前生成为图片缓存)
-        preRenderedImages = [];
-        const generatorDiv = document.getElementById('hidden-qr-generator');
+        preRenderedCanvases = [];
+        // 创建离屏 DOM 节点供 QRCode 库使用，避免重排
+        const hiddenDiv = document.createElement('div');
+        hiddenDiv.style.position = 'absolute';
+        hiddenDiv.style.top = '-9999px';
+        document.body.appendChild(hiddenDiv);
+
+        // 批量预渲染，每 10 帧让出一次线程，防止卡死 UI
+        for (let i = 0; i < totalFrames; i++) {
+            if (i % 10 === 0) await new Promise(r => setTimeout(r, 0));
+            
+            try {
+                hiddenDiv.innerHTML = '';
+                // 使用 M 级别纠错，平衡容量与识别率
+                new QRCode(hiddenDiv, { 
+                    width: 300, height: 300, 
+                    correctLevel: QRCode.CorrectLevel.M,
+                    colorDark: "#000000", colorLight: "#ffffff" 
+                }).makeCode(`${i}|${totalFrames}|${chunks[i]}`);
+                
+                const sourceCanvas = hiddenDiv.querySelector('canvas');
+                if (sourceCanvas) {
+                    // 克隆 Canvas 图像数据到独立内存节点
+                    const cachedCanvas = document.createElement('canvas');
+                    cachedCanvas.width = 300; cachedCanvas.height = 300;
+                    cachedCanvas.getContext('2d').drawImage(sourceCanvas, 0, 0);
+                    preRenderedCanvases.push(cachedCanvas);
+                }
+                statusEl.textContent = `预渲染进度: ${i + 1} / ${totalFrames}`;
+            } catch (e) {
+                alert(`二维码生成失败，可能单页字符过大 (容量溢出)，请调小单页字符。`);
+                cleanup();
+                return;
+            }
+        }
         
-        // 采用低容错率(L) 让二维码斑点更大，手机扫得更快
-        let qrEncoder = new QRCode(generatorDiv, { width: 300, height: 300, correctLevel: QRCode.CorrectLevel.L });
+        cleanup(); // 清理离屏 DOM
 
-        // 为了不卡死浏览器 UI，我们用 setTimeout 分步渲染
-        for (let i = 0; i < total; i++) {
-            await new Promise(resolve => {
-                setTimeout(() => {
-                    generatorDiv.innerHTML = ''; // 清空上一张
-                    // 格式： 索引|总数|真实数据
-                    qrEncoder = new QRCode(generatorDiv, { width: 300, height: 300, correctLevel: QRCode.CorrectLevel.L });
-                    qrEncoder.makeCode(`${i}|${total}|${chunks[i]}`);
-                    
-                    // 提取 canvas 转为 DataURL 缓存到内存
-                    const canvas = generatorDiv.querySelector('canvas');
-                    if (canvas) {
-                        preRenderedImages.push(canvas.toDataURL("image/png"));
-                    }
-                    statusEl.textContent = `预渲染进度: ${i + 1} / ${total}`;
-                    resolve();
-                }, 0);
-            });
+        function cleanup() {
+            if (hiddenDiv.parentNode) hiddenDiv.parentNode.removeChild(hiddenDiv);
         }
 
-        // 3. 开启极速闪烁引擎
+        // 开启极速闪烁引擎
         isSending = true;
         currentFrameIndex = 0;
         lastRenderTime = performance.now();
-        displayImg.style.display = 'block';
+        qrWrapper.style.display = 'inline-block';
         
         btn.textContent = '⏹ 停止闪烁';
         btn.classList.add('stop');
@@ -187,18 +274,15 @@
 
         function renderLoop(currentTime) {
             if (!isSending) return;
-            
             const elapsed = currentTime - lastRenderTime;
-            // 控制帧率
+            
             if (elapsed >= frameDuration) {
                 lastRenderTime = currentTime - (elapsed % frameDuration);
-                
-                // 瞬间切换图片 src，DOM 零重排，性能消耗近乎为 0
-                displayImg.src = preRenderedImages[currentFrameIndex];
-                statusEl.textContent = `极速广播中: 第 ${currentFrameIndex + 1} / ${total} 页 (无延迟)`;
-                
-                // 顺序循环
-                currentFrameIndex = (currentFrameIndex + 1) % total;
+                // 核心提速：直接内存绘制，零 DOM 解析开销
+                ctx.clearRect(0, 0, 300, 300);
+                ctx.drawImage(preRenderedCanvases[currentFrameIndex], 0, 0);
+                statusEl.textContent = `广播中: ${currentFrameIndex + 1} / ${totalFrames} 页 | FPS: ${targetFps}`;
+                currentFrameIndex = (currentFrameIndex + 1) % totalFrames;
             }
             sendAnimationId = requestAnimationFrame(renderLoop);
         }
@@ -213,20 +297,20 @@
         btn.textContent = '🚀 渲染并开始极限闪烁';
         btn.classList.remove('stop');
         document.getElementById('send-status').textContent = '已停止';
+        document.querySelector('.qr-wrapper').style.display = 'none';
     }
 
     // ==========================================
-    // 接收端：低分辨率极速捕获引擎
+    // 接收端：rVFC 帧同步 + 降采样极速引擎
     // ==========================================
     let isReceiving = false;
     let videoStream = null;
     let receiveAnimationId = null;
-    let receivedChunks = new Set(); // 抛弃复杂对象，用 Set 追求最高效查找
     let payloadData = [];
     let totalChunksCount = 0;
+    let lastMediaTime = -1;
     
-    // 核心提速参数：限制手机画布的渲染尺寸，大幅降低 jsQR 压力
-    const SCAN_MAX_WIDTH = 400; 
+    const SCAN_MAX_WIDTH = 450; 
 
     async function toggleReceive() {
         if (isReceiving) stopReceive();
@@ -237,27 +321,32 @@
         const video = document.getElementById('video');
         const btn = document.getElementById('btn-receive');
         
-        receivedChunks.clear();
         payloadData = [];
         totalChunksCount = 0;
         document.getElementById('receive-text').value = '';
         document.getElementById('progress-fill').style.width = '0%';
+        document.getElementById('finish-actions').style.display = 'none';
         keepAwake();
 
         try {
-            // 采用背部主摄像头，不需要追求过高分辨率，因为我们会压缩
             videoStream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } } 
+                video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } } 
             });
             video.srcObject = videoStream;
-            video.setAttribute("playsinline", true);
             video.play();
             
             isReceiving = true;
             btn.textContent = '⏹ 停止扫描';
             btn.classList.add('stop');
             
-            video.onplaying = () => { receiveAnimationId = requestAnimationFrame(scanTick); };
+            video.onplaying = () => {
+                // 优先使用 rVFC (精确对齐视频帧，避免重复解码)
+                if ('requestVideoFrameCallback' in video) {
+                    video.requestVideoFrameCallback(scanTick);
+                } else {
+                    receiveAnimationId = requestAnimationFrame(scanTick);
+                }
+            };
         } catch (err) {
             alert("开启相机失败，请检查权限。");
         }
@@ -274,15 +363,21 @@
         btn.classList.remove('stop');
     }
 
-    function scanTick() {
+    function scanTick(now, metadata) {
         if (!isReceiving) return;
+
+        // 帧同步去重：防止 rAF 导致同一帧被解码多次
+        if (metadata && metadata.mediaTime === lastMediaTime) {
+            video.requestVideoFrameCallback(scanTick);
+            return;
+        }
+        if (metadata) lastMediaTime = metadata.mediaTime;
 
         const video = document.getElementById('video');
         const canvasElement = document.getElementById('canvas');
         const ctx = canvasElement.getContext('2d', { willReadFrequently: true });
 
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            // 提速核心：等比例压缩画布
             const scale = Math.min(1, SCAN_MAX_WIDTH / video.videoWidth);
             canvasElement.width = video.videoWidth * scale;
             canvasElement.height = video.videoHeight * scale;
@@ -290,18 +385,19 @@
             ctx.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
             try {
                 const imageData = ctx.getImageData(0, 0, canvasElement.width, canvasElement.height);
-                // 彻底放开扫码频率限制，依靠降分辨率带来的性能冗余全速扫描
                 const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
-                if (code && code.data) {
-                    processQRCodeFast(code.data);
-                }
+                if (code && code.data) processQRCodeFast(code.data);
             } catch(e) {}
         }
-        receiveAnimationId = requestAnimationFrame(scanTick);
+
+        if ('requestVideoFrameCallback' in video) {
+            video.requestVideoFrameCallback(scanTick);
+        } else {
+            receiveAnimationId = requestAnimationFrame(scanTick);
+        }
     }
 
     function processQRCodeFast(rawData) {
-        // 格式： 索引|总数|真实数据
         const firstPipe = rawData.indexOf('|');
         const secondPipe = rawData.indexOf('|', firstPipe + 1);
         if (firstPipe === -1 || secondPipe === -1) return;
@@ -311,17 +407,25 @@
         const payload = rawData.substring(secondPipe + 1);
 
         if (isNaN(index) || isNaN(total)) return;
-        if (totalChunksCount === 0) totalChunksCount = total;
+        if (totalChunksCount === 0) {
+            totalChunksCount = total;
+            payloadData = new Array(total); // 预分配内存
+        }
 
-        if (!receivedChunks.has(index)) {
-            receivedChunks.add(index);
-            payloadData[index] = payload; // 直接落位数组
+        if (payloadData[index] === undefined) {
+            payloadData[index] = payload;
             
-            const percent = (receivedChunks.size / totalChunksCount) * 100;
+            const receivedCount = payloadData.filter(p => p !== undefined).length;
+            const percent = (receivedCount / totalChunksCount) * 100;
             document.getElementById('progress-fill').style.width = percent + '%';
-            document.getElementById('receive-status').textContent = `极速接收中: ${receivedChunks.size} / ${totalChunksCount}`;
+            document.getElementById('receive-status').textContent = `极速接收中: ${receivedCount} / ${totalChunksCount}`;
             
-            if (receivedChunks.size === totalChunksCount) {
+            // 显示强制完成按钮，防止最后几包漏掉卡死在 99%
+            if (percent > 90 && percent < 100) {
+                document.getElementById('finish-actions').style.display = 'flex';
+            }
+
+            if (receivedCount === totalChunksCount) {
                 finishTransfer();
             }
         }
@@ -331,13 +435,9 @@
         stopReceive();
         try {
             let fullB64 = payloadData.join('');
-            const originalText = decodeURIComponent(escape(atob(fullB64)));
+            const originalText = fromBase64(fullB64);
             document.getElementById('receive-text').value = originalText;
-            document.getElementById('receive-status').textContent = '🎉 接收完成！';
+            document.getElementById('receive-status').textContent = '🎉 完美接收完成！';
+            document.getElementById('finish-actions').style.display = 'none';
         } catch (e) {
-            document.getElementById('receive-status').textContent = '❌ 数据解析失败';
-        }
-    }
-</script>
-</body>
-</html>
+            document.getElementById('receive-status').textContent = '❌ 
