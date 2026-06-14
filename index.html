@@ -4,8 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light only">
-    <title>极速动态二维码传输 (暴力性能版)</title>
-    <!-- 保持原有依赖 -->
+    <title>极速动态二维码传输 (优化版)</title>
     <script src="./qrcode.min.js"></script>
     <script src="./jsQR.min.js"></script>
     <style>
@@ -13,431 +12,649 @@
             --primary: #2563eb;
             --primary-hover: #1d4ed8;
             --danger: #dc2626;
+            --danger-hover: #b91c1c;
             --success: #10b981;
-            --bg: #f3f4f6;
-            --card-bg: #ffffff;
             --text: #1f2937;
-            --text-secondary: #6b7280;
+            --text-light: #6b7280;
+            --bg: #f3f4f6;
+            --card-bg: white;
             --border: #e5e7eb;
         }
-
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-            background: var(--bg); margin: 0; padding: 15px; color: var(--text); 
-            -webkit-font-smoothing: antialiased;
-        }
-        .container { 
-            max-width: 600px; margin: 0 auto; background: var(--card-bg); 
-            padding: 24px; border-radius: 16px; box-shadow: 0 10px 30px -5px rgba(0,0,0,0.1); 
-        }
-        h1 { font-size: 22px; text-align: center; margin-bottom: 24px; color: #111827; margin-top:0; letter-spacing: -0.5px; }
-        
-        .tabs { display: flex; margin-bottom: 24px; background: #f1f5f9; padding: 4px; border-radius: 10px; }
-        .tab { 
-            flex: 1; text-align: center; padding: 10px; cursor: pointer; font-weight: 600; 
-            color: var(--text-secondary); border-radius: 8px; transition: all 0.2s; font-size: 14px;
-        }
-        .tab.active { 
-            color: var(--primary); background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.05); 
-        }
-        .panel { display: none; animation: fadeIn 0.3s ease; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); margin: 0; padding: 15px; color: var(--text); }
+        .container { max-width: 600px; margin: 0 auto; background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        h1 { font-size: 20px; text-align: center; margin: 0 0 20px; color: #111827; }
+        .tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid var(--border); }
+        .tab { flex: 1; text-align: center; padding: 12px; cursor: pointer; font-weight: 600; color: var(--text-light); transition: color 0.2s; }
+        .tab.active { color: var(--primary); border-bottom: 2px solid var(--primary); margin-bottom: -2px; }
+        .panel { display: none; }
         .panel.active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        textarea { width: 100%; height: 160px; padding: 10px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; resize: vertical; font-size: 14px; }
+        button { background: var(--primary); color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; width: 100%; margin-top: 10px; font-size: 15px; transition: background 0.2s; }
+        button:hover { background: var(--primary-hover); }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        button.stop { background: var(--danger); }
+        button.stop:hover { background: var(--danger-hover); }
+        
+        #qr-container { display: flex; justify-content: center; align-items: center; margin-top: 15px; min-height: 300px; background: #f9fafb; border-radius: 8px; border: 1px dashed var(--border); padding: 10px; }
+        #fast-qr-display { background: #fff !important; padding: 20px !important; border-radius: 8px; display: none; box-sizing: border-box; color-scheme: light !important; max-width: 100%; }
 
-        textarea { 
-            width: 100%; height: 140px; padding: 12px; border: 1px solid var(--border); 
-            border-radius: 8px; box-sizing: border-box; resize: vertical; font-size: 14px; 
-            font-family: inherit; transition: border-color 0.2s;
-        }
-        textarea:focus { outline: none; border-color: var(--primary); }
+        #video-container { width: 100%; overflow: hidden; background: #000; border-radius: 8px; margin-top: 15px; position: relative; }
+        video { width: 100%; height: auto; display: block; }
         
-        button { 
-            background: var(--primary); color: white; border: none; padding: 14px 20px; 
-            border-radius: 10px; cursor: pointer; font-weight: 600; width: 100%; margin-top: 12px; 
-            font-size: 15px; transition: all 0.2s; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
-        }
-        button:hover { background: var(--primary-hover); transform: translateY(-1px); }
-        button:active { transform: translateY(0); }
-        button.stop { background: var(--danger); box-shadow: 0 4px 6px -1px rgba(220, 38, 38, 0.2); }
-        button.stop:hover { background: #b91c1c; }
-        button.ghost { background: #f1f5f9; color: var(--text); box-shadow: none; border: 1px solid var(--border); }
-        button.ghost:hover { background: #e2e8f0; }
-        button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        .progress-bar { height: 8px; background: var(--border); border-radius: 4px; margin-top: 15px; overflow: hidden; }
+        .progress-fill { height: 100%; background: var(--success); width: 0%; transition: width 0.1s ease-out; }
+        .status { text-align: center; margin-top: 8px; font-size: 14px; font-weight: 600; color: var(--text-light); min-height: 20px; }
+        .ctrl-group { margin: 10px 0; display: flex; justify-content: space-between; align-items: center; font-size: 14px; flex-wrap: wrap; gap: 8px; }
+        .ctrl-group input { width: 110px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 4px; text-align: center; font-size: 13px; }
         
-        /* 二维码展示区：强制纯白背景，保证安静区(Quiet Zone) */
-        #qr-container { 
-            display: flex; justify-content: center; align-items: center; margin-top: 20px; 
-            min-height: 320px; background: #f8fafc; border-radius: 12px; border: 1px dashed var(--border); padding: 20px; 
-        }
-        .qr-wrapper {
-            background: #ffffff !important;
-            padding: 20px !important;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-            display: inline-block;
-            color-scheme: light !important;
-        }
-        #fast-qr-display { display: block; }
-
-        #video-container { 
-            width: 100%; overflow: hidden; background: #000; border-radius: 12px; 
-            margin-top: 15px; position: relative; aspect-ratio: 4/3;
-        }
-        video { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .action-bar { display: flex; gap: 8px; margin-top: 10px; }
+        .action-bar button { width: auto; flex: 1; margin-top: 0; }
         
-        .progress-bar { height: 10px; background: #e2e8f0; border-radius: 5px; margin-top: 15px; overflow: hidden; }
-        .progress-fill { height: 100%; background: linear-gradient(90deg, #10b981, #34d399); width: 0%; transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
-        
-        .status { text-align: center; margin-top: 10px; font-size: 13px; font-weight: 600; color: var(--text-secondary); min-height: 20px; }
-        .ctrl-group { margin: 12px 0; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
-        .ctrl-group label { color: var(--text-secondary); font-weight: 500; }
-        .ctrl-group input { 
-            width: 90px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; 
-            text-align: center; font-size: 14px; font-weight: 600;
-        }
-        .action-row { display: flex; gap: 10px; margin-top: 12px; }
-        .action-row button { flex: 1; margin-top: 0; }
+        /* 预渲染进度 */
+        .pre-render-progress { margin-top: 10px; display: none; }
+        .pre-render-progress.show { display: block; }
+        .pre-render-bar { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+        .pre-render-fill { height: 100%; background: var(--primary); width: 0%; transition: width 0.1s; }
+        .pre-render-text { font-size: 12px; color: var(--text-light); text-align: center; margin-top: 4px; }
     </style>
 </head>
 <body>
 <div class="container">
     <h1>🚀 极速动态二维码传输</h1>
-    <div class="tabs">
-        <div class="tab active" onclick="switchTab('send')">💻 电脑发送</div>
-        <div class="tab" onclick="switchTab('receive')">📱 手机接收</div>
+    
+    <div class="tabs" role="tablist">
+        <button class="tab active" role="tab" aria-selected="true" data-tab="send">电脑发送</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="receive">手机接收</button>
     </div>
 
-    <div id="panel-send" class="panel active">
-        <textarea id="send-text" placeholder="请在此处粘贴需要传输的长文本 (支持中文)..."></textarea>
+    <!-- 发送面板 -->
+    <div id="panel-send" class="panel active" role="tabpanel">
+        <textarea id="send-text" placeholder="粘贴需要传输的文本（建议 < 50KB）..." maxlength="200000"></textarea>
         <div class="ctrl-group">
-            <label>单页字符 (推荐 200):</label>
-            <input type="number" id="chunk-size" value="200" min="50" max="1500">
+            <label>单页字符:</label>
+            <input type="number" id="chunk-size" value="200" min="50" max="800">
         </div>
         <div class="ctrl-group">
-            <label>闪烁速度 (FPS):</label>
+            <label>刷新频率 (FPS):</label>
             <input type="number" id="fps" value="15" min="1" max="30">
         </div>
-        <button id="btn-send" onclick="toggleSend()">🚀 渲染并开始极限闪烁</button>
-        <div id="qr-container">
-            <div class="qr-wrapper" style="display:none;">
-                <canvas id="fast-qr-display" width="300" height="300"></canvas>
-            </div>
+        
+        <button id="btn-send">🚀 开始传输</button>
+        
+        <div class="pre-render-progress" id="pre-render-progress">
+            <div class="pre-render-bar"><div class="pre-render-fill" id="pre-render-fill"></div></div>
+            <div class="pre-render-text" id="pre-render-text">准备中...</div>
         </div>
-        <div id="send-status" class="status">未开始</div>
+        
+        <div id="qr-container">
+            <img id="fast-qr-display" alt="QR Code" />
+        </div>
+        <div id="send-status" class="status">就绪</div>
     </div>
 
-    <div id="panel-receive" class="panel">
-        <button id="btn-receive" onclick="toggleReceive()">📸 开启极速扫描</button>
+    <!-- 接收面板 -->
+    <div id="panel-receive" class="panel" role="tabpanel">
+        <button id="btn-receive">📸 开始扫描</button>
         <div id="video-container">
             <video id="video" playsinline muted></video>
-            <canvas id="canvas" style="display:none;"></canvas>
+            <canvas id="canvas" hidden></canvas>
         </div>
         <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
         <div id="receive-status" class="status">等待开始...</div>
-        <textarea id="receive-text" placeholder="接收完成后，完整文本会直接显示在这里..." readonly style="margin-top:15px; background:#f8fafc; height: 160px;"></textarea>
-        <div class="action-row" id="finish-actions" style="display:none;">
-            <button class="ghost" onclick="forceFinish()">⚠️ 强制完成 (漏包)</button>
-            <button onclick="clearReceive()">🗑️ 清空并重试</button>
+        <textarea id="receive-text" placeholder="接收的文本将显示在这里..." readonly style="margin-top:15px; background:#f9fafb; height: 180px;"></textarea>
+        <div class="action-bar" id="action-bar" style="display:none;">
+            <button id="btn-copy">📋 复制</button>
+            <button id="btn-reset">🔄 重新接收</button>
         </div>
     </div>
 </div>
 
+<div id="hidden-qr-generator" hidden></div>
+
 <script>
-    // ==========================================
-    // 核心工具函数：高性能 UTF-8 Base64 编解码
-    // 彻底解决中文转 encodeURIComponent 后体积膨胀 3 倍的致命问题
-    // ==========================================
-    const encoder = new TextEncoder();
-    const decoder = new TextDecoder();
-    function toBase64(str) {
-        return btoa(String.fromCharCode(...encoder.encode(str)));
-    }
-    function fromBase64(b64) {
-        return decoder.decode(Uint8Array.from(atob(b64), c => c.charCodeAt(0)));
-    }
-
-    // --- 防止息屏 API ---
-    let wakeLock = null;
-    async function keepAwake() {
-        try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
-    }
-    function releaseAwake() {
-        if (wakeLock !== null) { wakeLock.release().then(() => wakeLock = null); }
-    }
-
-    function switchTab(type) {
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-        if(type === 'send') {
-            document.querySelectorAll('.tab')[0].classList.add('active');
-            document.getElementById('panel-send').classList.add('active');
-            stopReceive();
-        } else {
-            document.querySelectorAll('.tab')[1].classList.add('active');
-            document.getElementById('panel-receive').classList.add('active');
-            stopSend();
-        }
-    }
-
-    // ==========================================
-    // 发送端：Canvas 直绘 + 批量预渲染引擎
-    // ==========================================
-    let isSending = false;
-    let preRenderedCanvases = []; // 直接缓存 Canvas 节点，性能碾压 Image Base64
-    let currentFrameIndex = 0;
-    let lastRenderTime = 0;
-    let sendAnimationId = null;
-    let totalFrames = 0;
-
-    async function toggleSend() {
-        if (isSending) stopSend();
-        else await startSend();
-    }
-
-    async function startSend() {
-        const text = document.getElementById('send-text').value.trim();
-        if (!text) { alert('请先输入文本！'); return; }
-
-        keepAwake();
-        const btn = document.getElementById('btn-send');
-        const statusEl = document.getElementById('send-status');
-        const qrWrapper = document.querySelector('.qr-wrapper');
-        const displayCanvas = document.getElementById('fast-qr-display');
-        const ctx = displayCanvas.getContext('2d');
-        
-        btn.textContent = '⏳ 正在暴力预渲染内存...';
-        btn.disabled = true;
-        statusEl.textContent = "准备数据中，请稍候...";
-
-        const chunkSize = parseInt(document.getElementById('chunk-size').value) || 200;
-        const b64Data = toBase64(text);
-        const chunks = [];
-        for (let i = 0; i < b64Data.length; i += chunkSize) {
-            chunks.push(b64Data.substring(i, i + chunkSize));
-        }
-        totalFrames = chunks.length;
-
-        preRenderedCanvases = [];
-        // 创建离屏 DOM 节点供 QRCode 库使用，避免重排
-        const hiddenDiv = document.createElement('div');
-        hiddenDiv.style.position = 'absolute';
-        hiddenDiv.style.top = '-9999px';
-        document.body.appendChild(hiddenDiv);
-
-        // 批量预渲染，每 10 帧让出一次线程，防止卡死 UI
-        for (let i = 0; i < totalFrames; i++) {
-            if (i % 10 === 0) await new Promise(r => setTimeout(r, 0));
-            
-            try {
-                hiddenDiv.innerHTML = '';
-                // 使用 M 级别纠错，平衡容量与识别率
-                new QRCode(hiddenDiv, { 
-                    width: 300, height: 300, 
-                    correctLevel: QRCode.CorrectLevel.M,
-                    colorDark: "#000000", colorLight: "#ffffff" 
-                }).makeCode(`${i}|${totalFrames}|${chunks[i]}`);
-                
-                const sourceCanvas = hiddenDiv.querySelector('canvas');
-                if (sourceCanvas) {
-                    // 克隆 Canvas 图像数据到独立内存节点
-                    const cachedCanvas = document.createElement('canvas');
-                    cachedCanvas.width = 300; cachedCanvas.height = 300;
-                    cachedCanvas.getContext('2d').drawImage(sourceCanvas, 0, 0);
-                    preRenderedCanvases.push(cachedCanvas);
-                }
-                statusEl.textContent = `预渲染进度: ${i + 1} / ${totalFrames}`;
-            } catch (e) {
-                alert(`二维码生成失败，可能单页字符过大 (容量溢出)，请调小单页字符。`);
-                cleanup();
-                return;
-            }
-        }
-        
-        cleanup(); // 清理离屏 DOM
-
-        function cleanup() {
-            if (hiddenDiv.parentNode) hiddenDiv.parentNode.removeChild(hiddenDiv);
-        }
-
-        // 开启极速闪烁引擎
-        isSending = true;
-        currentFrameIndex = 0;
-        lastRenderTime = performance.now();
-        qrWrapper.style.display = 'inline-block';
-        
-        btn.textContent = '⏹ 停止闪烁';
-        btn.classList.add('stop');
-        btn.disabled = false;
-        
-        const targetFps = parseInt(document.getElementById('fps').value) || 15;
-        const frameDuration = 1000 / targetFps;
-
-        function renderLoop(currentTime) {
-            if (!isSending) return;
-            const elapsed = currentTime - lastRenderTime;
-            
-            if (elapsed >= frameDuration) {
-                lastRenderTime = currentTime - (elapsed % frameDuration);
-                // 核心提速：直接内存绘制，零 DOM 解析开销
-                ctx.clearRect(0, 0, 300, 300);
-                ctx.drawImage(preRenderedCanvases[currentFrameIndex], 0, 0);
-                statusEl.textContent = `广播中: ${currentFrameIndex + 1} / ${totalFrames} 页 | FPS: ${targetFps}`;
-                currentFrameIndex = (currentFrameIndex + 1) % totalFrames;
-            }
-            sendAnimationId = requestAnimationFrame(renderLoop);
-        }
-        sendAnimationId = requestAnimationFrame(renderLoop);
-    }
-
-    function stopSend() {
-        isSending = false;
-        if (sendAnimationId) cancelAnimationFrame(sendAnimationId);
-        releaseAwake();
-        const btn = document.getElementById('btn-send');
-        btn.textContent = '🚀 渲染并开始极限闪烁';
-        btn.classList.remove('stop');
-        document.getElementById('send-status').textContent = '已停止';
-        document.querySelector('.qr-wrapper').style.display = 'none';
-    }
-
-    // ==========================================
-    // 接收端：rVFC 帧同步 + 降采样极速引擎
-    // ==========================================
-    let isReceiving = false;
-    let videoStream = null;
-    let receiveAnimationId = null;
-    let payloadData = [];
-    let totalChunksCount = 0;
-    let lastMediaTime = -1;
+/**
+ * 工具函数模块
+ */
+const Utils = {
+    // 安全编码：支持 Unicode 的 Base64 编码
+    encodeToBase64(str) {
+        const encoder = new TextEncoder();
+        const bytes = encoder.encode(str);
+        let binary = '';
+        bytes.forEach(b => binary += String.fromCharCode(b));
+        return btoa(binary);
+    },
     
-    const SCAN_MAX_WIDTH = 450; 
-
-    async function toggleReceive() {
-        if (isReceiving) stopReceive();
-        else startReceive();
+    // 安全解码
+    decodeFromBase64(b64) {
+        const binary = atob(b64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+        const decoder = new TextDecoder();
+        return decoder.decode(bytes);
+    },
+    
+    // 缓存 DOM 查询
+    cacheSelectors(selectors) {
+        const cache = {};
+        for (const [key, selector] of Object.entries(selectors)) {
+            cache[key] = typeof selector === 'string' 
+                ? document.querySelector(selector) 
+                : selector;
+        }
+        return cache;
+    },
+    
+    // 防抖函数
+    debounce(fn, delay) {
+        let timer = null;
+        return function(...args) {
+            clearTimeout(timer);
+            timer = setTimeout(() => fn.apply(this, args), delay);
+        };
     }
+};
 
-    async function startReceive() {
-        const video = document.getElementById('video');
-        const btn = document.getElementById('btn-receive');
-        
-        payloadData = [];
-        totalChunksCount = 0;
-        document.getElementById('receive-text').value = '';
-        document.getElementById('progress-fill').style.width = '0%';
-        document.getElementById('finish-actions').style.display = 'none';
-        keepAwake();
-
+/**
+ * 唤醒锁管理（兼容降级）
+ */
+class WakeLockManager {
+    constructor() {
+        this.wakeLock = null;
+        this.supported = 'wakeLock' in navigator;
+    }
+    
+    async request() {
+        if (!this.supported) return false;
         try {
-            videoStream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } } 
-            });
-            video.srcObject = videoStream;
-            video.play();
-            
-            isReceiving = true;
-            btn.textContent = '⏹ 停止扫描';
-            btn.classList.add('stop');
-            
-            video.onplaying = () => {
-                // 优先使用 rVFC (精确对齐视频帧，避免重复解码)
-                if ('requestVideoFrameCallback' in video) {
-                    video.requestVideoFrameCallback(scanTick);
-                } else {
-                    receiveAnimationId = requestAnimationFrame(scanTick);
-                }
-            };
-        } catch (err) {
-            alert("开启相机失败，请检查权限。");
+            this.wakeLock = await navigator.wakeLock.request('screen');
+            // 处理页面可见性变化
+            document.addEventListener('visibilitychange', this.#handleVisibilityChange);
+            return true;
+        } catch {
+            return false;
         }
     }
-
-    function stopReceive() {
-        isReceiving = false;
-        releaseAwake();
-        if (receiveAnimationId) cancelAnimationFrame(receiveAnimationId);
-        if (videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; }
-        
-        const btn = document.getElementById('btn-receive');
-        btn.textContent = '📸 开启极速扫描';
-        btn.classList.remove('stop');
+    
+    async release() {
+        if (this.wakeLock) {
+            await this.wakeLock.release();
+            this.wakeLock = null;
+        }
+        document.removeEventListener('visibilitychange', this.#handleVisibilityChange);
     }
+    
+    #handleVisibilityChange = async () => {
+        if (this.wakeLock && document.visibilityState === 'visible') {
+            try {
+                this.wakeLock = await navigator.wakeLock.request('screen');
+            } catch {}
+        }
+    }
+}
 
-    function scanTick(now, metadata) {
-        if (!isReceiving) return;
-
-        // 帧同步去重：防止 rAF 导致同一帧被解码多次
-        if (metadata && metadata.mediaTime === lastMediaTime) {
-            video.requestVideoFrameCallback(scanTick);
+/**
+ * 发送端模块
+ */
+class Sender {
+    constructor(dom) {
+        this.dom = dom;
+        this.isSending = false;
+        this.isPreRendering = false;
+        this.frames = []; // 存储 Blob URLs
+        this.currentIndex = 0;
+        this.animationId = null;
+        this.qrInstance = null;
+        this.wakeLock = new WakeLockManager();
+        
+        this.#initEvents();
+    }
+    
+    #initEvents() {
+        this.dom.btnSend.addEventListener('click', () => this.toggle());
+    }
+    
+    async toggle() {
+        if (this.isPreRendering || this.isSending) {
+            await this.stop();
+        } else {
+            await this.start();
+        }
+    }
+    
+    async start() {
+        const text = this.dom.sendText.value.trim();
+        if (!text) {
+            this.#showStatus('请输入要传输的文本', 'error');
             return;
         }
-        if (metadata) lastMediaTime = metadata.mediaTime;
-
-        const video = document.getElementById('video');
-        const canvasElement = document.getElementById('canvas');
-        const ctx = canvasElement.getContext('2d', { willReadFrequently: true });
-
-        if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            const scale = Math.min(1, SCAN_MAX_WIDTH / video.videoWidth);
-            canvasElement.width = video.videoWidth * scale;
-            canvasElement.height = video.videoHeight * scale;
-            
-            ctx.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
-            try {
-                const imageData = ctx.getImageData(0, 0, canvasElement.width, canvasElement.height);
-                const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
-                if (code && code.data) processQRCodeFast(code.data);
-            } catch(e) {}
+        if (text.length > 200000) {
+            this.#showStatus('文本过长，建议分批传输（<200KB）', 'error');
+            return;
         }
 
-        if ('requestVideoFrameCallback' in video) {
-            video.requestVideoFrameCallback(scanTick);
-        } else {
-            receiveAnimationId = requestAnimationFrame(scanTick);
-        }
-    }
+        await this.wakeLock.request();
+        this.#setButtonState(true, '预渲染中...');
+        this.dom.preRenderProgress.classList.add('show');
+        this.isPreRendering = true;
 
-    function processQRCodeFast(rawData) {
-        const firstPipe = rawData.indexOf('|');
-        const secondPipe = rawData.indexOf('|', firstPipe + 1);
-        if (firstPipe === -1 || secondPipe === -1) return;
-
-        const index = parseInt(rawData.substring(0, firstPipe));
-        const total = parseInt(rawData.substring(firstPipe + 1, secondPipe));
-        const payload = rawData.substring(secondPipe + 1);
-
-        if (isNaN(index) || isNaN(total)) return;
-        if (totalChunksCount === 0) {
-            totalChunksCount = total;
-            payloadData = new Array(total); // 预分配内存
-        }
-
-        if (payloadData[index] === undefined) {
-            payloadData[index] = payload;
-            
-            const receivedCount = payloadData.filter(p => p !== undefined).length;
-            const percent = (receivedCount / totalChunksCount) * 100;
-            document.getElementById('progress-fill').style.width = percent + '%';
-            document.getElementById('receive-status').textContent = `极速接收中: ${receivedCount} / ${totalChunksCount}`;
-            
-            // 显示强制完成按钮，防止最后几包漏掉卡死在 99%
-            if (percent > 90 && percent < 100) {
-                document.getElementById('finish-actions').style.display = 'flex';
-            }
-
-            if (receivedCount === totalChunksCount) {
-                finishTransfer();
-            }
-        }
-    }
-
-    function finishTransfer() {
-        stopReceive();
         try {
-            let fullB64 = payloadData.join('');
-            const originalText = fromBase64(fullB64);
-            document.getElementById('receive-text').value = originalText;
-            document.getElementById('receive-status').textContent = '🎉 完美接收完成！';
-            document.getElementById('finish-actions').style.display = 'none';
+            // 1. 数据编码与分片
+            const chunkSize = parseInt(this.dom.chunkSize.value) || 200;
+            const encoded = Utils.encodeToBase64(text);
+            const chunks = this.#chunkString(encoded, chunkSize);
+            const total = chunks.length;
+
+            // 2. 预渲染二维码（复用实例 + Blob URL）
+            await this.#preRenderQRChunks(chunks, total);
+            
+            // 3. 开始播放
+            this.#startPlayback(chunks.length);
+            
+        } catch (err) {
+            console.error('Send error:', err);
+            this.#showStatus('传输启动失败', 'error');
+            await this.stop();
+        }
+    }
+    
+    async #preRenderQRChunks(chunks, total) {
+        const container = this.dom.hiddenGenerator;
+        const fps = Math.min(30, parseInt(this.dom.fps.value) || 15);
+        
+        // 初始化 QRCode 实例（只创建一次）
+        this.qrInstance = new QRCode(container, {
+            width: 300, height: 300,
+            correctLevel: QRCode.CorrectLevel.L
+        });
+
+        this.frames = [];
+        
+        // 分步渲染避免阻塞
+        for (let i = 0; i < total; i++) {
+            if (!this.isPreRendering) throw new Error('Cancelled');
+            
+            // 更新进度
+            const progress = ((i + 1) / total) * 100;
+            this.dom.preRenderFill.style.width = `${progress}%`;
+            this.dom.preRenderText.textContent = `渲染 ${i + 1}/${total}`;
+            
+            // 生成二维码
+            container.innerHTML = '';
+            this.qrInstance.makeCode(`${i}|${total}|${chunks[i]}`);
+            
+            // 转为 Blob URL（比 DataURL 节省 ~30% 内存）
+            const canvas = container.querySelector('canvas');
+            if (canvas) {
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                const url = URL.createObjectURL(blob);
+                this.frames.push(url);
+            }
+            
+            // 让出主线程
+            await new Promise(resolve => setTimeout(resolve, 0));
+        }
+        
+        this.dom.preRenderProgress.classList.remove('show');
+        this.isPreRendering = false;
+    }
+    
+    #startPlayback(total) {
+        this.isSending = true;
+        this.currentIndex = 0;
+        this.dom.qrDisplay.style.display = 'block';
+        
+        this.#setButtonState(false, '⏹ 停止传输');
+        this.#showStatus('传输中...');
+        
+        const frameDuration = 1000 / (parseInt(this.dom.fps.value) || 15);
+        let lastTime = performance.now();
+        
+        const renderLoop = (currentTime) => {
+            if (!this.isSending) return;
+            
+            const elapsed = currentTime - lastTime;
+            if (elapsed >= frameDuration) {
+                lastTime = currentTime - (elapsed % frameDuration);
+                
+                // 切换图片（使用 Blob URL）
+                this.dom.qrDisplay.src = this.frames[this.currentIndex];
+                this.#showStatus(`📡 发送: ${this.currentIndex + 1}/${total}`);
+                
+                this.currentIndex = (this.currentIndex + 1) % total;
+            }
+            this.animationId = requestAnimationFrame(renderLoop);
+        };
+        
+        this.animationId = requestAnimationFrame(renderLoop);
+    }
+    
+    async stop() {
+        this.isPreRendering = false;
+        this.isSending = false;
+        
+        if (this.animationId) cancelAnimationFrame(this.animationId);
+        await this.wakeLock.release();
+        
+        // 清理 Blob URLs
+        this.frames.forEach(url => URL.revokeObjectURL(url));
+        this.frames = [];
+        
+        this.dom.qrDisplay.style.display = 'none';
+        this.dom.qrDisplay.src = '';
+        this.#setButtonState(false, '🚀 开始传输');
+        this.#showStatus('已停止');
+    }
+    
+    #chunkString(str, size) {
+        const chunks = [];
+        for (let i = 0; i < str.length; i += size) {
+            chunks.push(str.slice(i, i + size));
+        }
+        return chunks;
+    }
+    
+    #setButtonState(disabled, text) {
+        this.dom.btnSend.disabled = disabled;
+        this.dom.btnSend.textContent = text;
+        this.dom.btnSend.classList.toggle('stop', !disabled && text.includes('停止'));
+    }
+    
+    #showStatus(msg, type = 'info') {
+        this.dom.sendStatus.textContent = msg;
+        this.dom.sendStatus.style.color = type === 'error' ? 'var(--danger)' : 'var(--text-light)';
+    }
+}
+
+/**
+ * 接收端模块
+ */
+class Receiver {
+    constructor(dom) {
+        this.dom = dom;
+        this.isReceiving = false;
+        this.stream = null;
+        this.animationId = null;
+        this.chunks = new Map(); // 使用 Map 替代稀疏数组
+        this.totalCount = 0;
+        this.wakeLock = new WakeLockManager();
+        
+        // 性能参数
+        this.SCAN_INTERVAL = 100; // 最小扫描间隔(ms)
+        this.SCAN_MAX_WIDTH = 400;
+        this.lastScanTime = 0;
+        
+        this.#initEvents();
+    }
+    
+    #initEvents() {
+        this.dom.btnReceive.addEventListener('click', () => this.toggle());
+        this.dom.btnCopy?.addEventListener('click', () => this.#copyResult());
+        this.dom.btnReset?.addEventListener('click', () => this.reset());
+    }
+    
+    async toggle() {
+        if (this.isReceiving) {
+            await this.stop();
+        } else {
+            await this.start();
+        }
+    }
+    
+    async start() {
+        this.#resetState();
+        await this.wakeLock.request();
+        
+        try {
+            this.stream = await navigator.mediaDevices.getUserMedia({
+                video: { 
+                    facingMode: 'environment',
+                    width: { ideal: 640 },
+                    height: { ideal: 480 }
+                }
+            });
+            
+            this.dom.video.srcObject = this.stream;
+            await this.dom.video.play();
+            
+            this.isReceiving = true;
+            this.#setButtonState(true, '⏹ 停止扫描');
+            this.#showStatus('扫描中... 请对准二维码');
+            
+            this.dom.video.onplaying = () => {
+                this.lastScanTime = 0;
+                this.#scanLoop();
+            };
+            
+        } catch (err) {
+            console.error('Camera error:', err);
+            this.#showStatus('❌ 相机启动失败，请检查权限', 'error');
+            await this.stop();
+        }
+    }
+    
+    async stop() {
+        this.isReceiving = false;
+        await this.wakeLock.release();
+        
+        if (this.animationId) cancelAnimationFrame(this.animationId);
+        if (this.stream) {
+            this.stream.getTracks().forEach(t => t.stop());
+            this.stream = null;
+        }
+        if (this.dom.video.srcObject) {
+            this.dom.video.srcObject = null;
+        }
+        
+        this.#setButtonState(false, '📸 开始扫描');
+    }
+    
+    #scanLoop = () => {
+        if (!this.isReceiving) return;
+        
+        const now = performance.now();
+        // 控制扫描频率，避免 CPU 过载
+        if (now - this.lastScanTime < this.SCAN_INTERVAL) {
+            this.animationId = requestAnimationFrame(this.#scanLoop);
+            return;
+        }
+        this.lastScanTime = now;
+        
+        const { video, canvas, ctx } = this.dom;
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            // 降分辨率处理
+            const scale = Math.min(1, this.SCAN_MAX_WIDTH / video.videoWidth);
+            canvas.width = video.videoWidth * scale;
+            canvas.height = video.videoHeight * scale;
+            
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            try {
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                    inversionAttempts: 'dontInvert'
+                });
+                
+                if (code?.data) {
+                    this.#processQR(code.data);
+                }
+            } catch (e) {
+                // 静默处理解码错误
+            }
+        }
+        
+        this.animationId = requestAnimationFrame(this.#scanLoop);
+    };
+    
+    #processQR(rawData) {
+        // 解析格式: index|total|payload
+        const parts = rawData.split('|');
+        if (parts.length < 3) return;
+        
+        const index = parseInt(parts[0]);
+        const total = parseInt(parts[1]);
+        const payload = parts.slice(2).join('|'); // 支持 payload 中含 |
+        
+        if (isNaN(index) || isNaN(total)) return;
+        
+        // 初始化总数
+        if (this.totalCount === 0) this.totalCount = total;
+        
+        // 去重存储
+        if (!this.chunks.has(index)) {
+            this.chunks.set(index, payload);
+            this.#updateProgress();
+            
+            // 检查是否完成
+            if (this.chunks.size === this.totalCount) {
+                this.#completeTransfer();
+            }
+        }
+    }
+    
+    #updateProgress() {
+        const percent = (this.chunks.size / this.totalCount) * 100;
+        this.dom.progressFill.style.width = `${Math.min(100, percent)}%`;
+        this.#showStatus(`📥 接收: ${this.chunks.size}/${this.totalCount}`);
+    }
+    
+    #completeTransfer() {
+        this.stop();
+        
+        try {
+            // 按索引排序拼接
+            const sorted = Array.from({ length: this.totalCount }, (_, i) => this.chunks.get(i)).filter(Boolean);
+            const fullB64 = sorted.join('');
+            const result = Utils.decodeFromBase64(fullB64);
+            
+            this.dom.receiveText.value = result;
+            this.#showStatus('✅ 接收完成！', 'success');
+            this.dom.actionBar.style.display = 'flex';
+            
         } catch (e) {
-            document.getElementById('receive-status').textContent = '❌ 
+            console.error('Decode error:', e);
+            this.#showStatus('❌ 数据解析失败', 'error');
+        }
+    }
+    
+    #copyResult() {
+        const text = this.dom.receiveText.value;
+        if (!text) return;
+        
+        navigator.clipboard?.writeText(text).then(() => {
+            const btn = this.dom.btnCopy;
+            const original = btn.textContent;
+            btn.textContent = '✅ 已复制';
+            setTimeout(() => btn.textContent = original, 1500);
+        }).catch(() => {
+            // 降级方案
+            this.dom.receiveText.select();
+            document.execCommand('copy');
+        });
+    }
+    
+    reset() {
+        this.#resetState();
+        this.dom.actionBar.style.display = 'none';
+        this.dom.receiveText.value = '';
+        this.#showStatus('等待开始...');
+    }
+    
+    #resetState() {
+        this.chunks.clear();
+        this.totalCount = 0;
+        this.dom.progressFill.style.width = '0%';
+    }
+    
+    #setButtonState(disabled, text) {
+        this.dom.btnReceive.disabled = disabled;
+        this.dom.btnReceive.textContent = text;
+        this.dom.btnReceive.classList.toggle('stop', !disabled && text.includes('停止'));
+    }
+    
+    #showStatus(msg, type = 'info') {
+        this.dom.receiveStatus.textContent = msg;
+        const colors = {
+            info: 'var(--text-light)',
+            success: 'var(--success)',
+            error: 'var(--danger)'
+        };
+        this.dom.receiveStatus.style.color = colors[type] || colors.info;
+    }
+}
+
+/**
+ * 主应用入口
+ */
+document.addEventListener('DOMContentLoaded', () => {
+    // 缓存 DOM
+    const dom = Utils.cacheSelectors({
+        // 通用
+        tabs: '.tabs',
+        panels: '.panel',
+        // 发送端
+        sendText: '#send-text',
+        chunkSize: '#chunk-size',
+        fps: '#fps',
+        btnSend: '#btn-send',
+        qrDisplay: '#fast-qr-display',
+        sendStatus: '#send-status',
+        preRenderProgress: '#pre-render-progress',
+        preRenderFill: '#pre-render-fill',
+        preRenderText: '#pre-render-text',
+        hiddenGenerator: '#hidden-qr-generator',
+        // 接收端
+        btnReceive: '#btn-receive',
+        video: '#video',
+        canvas: '#canvas',
+        progressFill: '#progress-fill',
+        receiveStatus: '#receive-status',
+        receiveText: '#receive-text',
+        actionBar: '#action-bar',
+        btnCopy: '#btn-copy',
+        btnReset: '#btn-reset'
+    });
+    
+    // 添加 canvas context
+    dom.canvas.width = 400;
+    dom.canvas.height = 300;
+    dom.ctx = dom.canvas.getContext('2d', { willReadFrequently: true });
+    
+    // 初始化模块
+    const sender = new Sender(dom);
+    const receiver = new Receiver(dom);
+    
+    // Tab 切换逻辑
+    dom.tabs.addEventListener('click', (e) => {
+        const tab = e.target.closest('.tab');
+        if (!tab) return;
+        
+        // 更新 tab 状态
+        dom.tabs.querySelectorAll('.tab').forEach(t => {
+            t.classList.remove('active');
+            t.setAttribute('aria-selected', 'false');
+        });
+        tab.classList.add('active');
+        tab.setAttribute('aria-selected', 'true');
+        
+        // 切换面板
+        const target = tab.dataset.tab;
+        dom.panels.forEach(p => p.classList.remove('active'));
+        document.getElementById(`panel-${target}`).classList.add('active');
+        
+        // 切换时停止另一端的运行
+        if (target === 'send') receiver.stop();
+        else sender.stop();
+    });
+    
+    // 页面卸载时清理
+    window.addEventListener('beforeunload', async () => {
+        await sender.stop();
+        await receiver.stop();
+    });
+});
+</script>
+</body>
+</html>
