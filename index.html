@@ -22,7 +22,6 @@
         button.stop { background: #dc2626; }
         button.stop:hover { background: #b91c1c; }
         
-        /* 💡 终极对抗黑暗模式：绝对死守组件纯白背景与安全静区 */
         #qr-container { display: flex; justify-content: center; align-items: center; margin-top: 15px; min-height: 300px; background: #f9fafb; border-radius: 8px; border: 1px dashed #d1d5db; padding: 10px; }
         #qrcode { 
             background-color: #ffffff !important; 
@@ -70,7 +69,7 @@
         </div>
         <div class="ctrl-group">
             <label>闪烁速度 (FPS):</label>
-            <input type="number" id="fps" value="20" min="1" max="60">
+            <input type="number" id="fps" value="10" min="1" max="20">
         </div>
         <button id="btn-send" onclick="toggleSend()">生成并循环闪烁二维码</button>
         <div id="qr-container"><div id="qrcode"></div></div>
@@ -105,7 +104,6 @@
         }
     }
 
-    // 💡 核心底层算法：高效安全的字符串 XOR 异或处理器 (增加边界容错)
     function xorStrings(s1, s2) {
         let res = "";
         const len = Math.max(s1.length, s2.length);
@@ -136,7 +134,6 @@
         }
     }
 
-    // --- 发送端逻辑 ---
     let sendInterval = null, qrEncoder = null;
     function toggleSend() { sendInterval ? stopSend() : startSend(); }
 
@@ -150,7 +147,7 @@
         qrEncoder = new QRCode(document.getElementById("qrcode"), { width: 280, height: 280, correctLevel: levelVal });
         
         const chunkSize = parseInt(document.getElementById('chunk-size').value) || 300;
-        const fps = parseInt(document.getElementById('fps').value) || 6;
+        const fps = parseInt(document.getElementById('fps').value) || 20;
         
         const b64Data = btoa(encodeURIComponent(text));
         const chunks = [];
@@ -160,18 +157,15 @@
             chunks.push(chunk);
         }
         
-        // 💡 修复奇数分片漏洞：补齐偶数，确保所有数据都有 RAID5 校验保护
         if (chunks.length % 2 !== 0) {
             chunks.push(''.padEnd(chunkSize, ' '));
         }
         const total = chunks.length;
         
-        // 构造数据集（包含原始帧 D 和 冗余校验帧 P）
         const packets = [];
         for (let i = 0; i < total; i++) {
             packets.push({ type: 'D', index: i, payload: chunks[i] });
         }
-        // 每两个包生成一个交织校验包 (RAID-5 模式)
         for (let i = 0; i < total - 1; i += 2) {
             let parityPayload = xorStrings(chunks[i], chunks[i+1]);
             packets.push({ type: 'P', idx1: i, idx2: i+1, payload: parityPayload });
@@ -212,9 +206,8 @@
         document.getElementById('send-status').textContent = '已停止';
     }
 
-    // --- 接收端逻辑 ---
     let videoStream = null, scanAnimationId = null, receivedChunks = {}, receivedParity = {}, totalChunksCount = 0, isScanning = false;
-    let lastScanTime = 0;
+    let decodeCtx = null; // 💡 提取到全局，避免重复获取上下文
 
     function toggleReceive() { isScanning ? stopReceive() : startReceive(); }
 
@@ -233,10 +226,15 @@
             video.srcObject = videoStream;
             video.setAttribute("playsinline", true);
             video.play();
+            
+            // 💡 初始化低分辨率解码画布
+            const decodeCanvas = document.getElementById('canvas');
+            decodeCtx = decodeCanvas.getContext('2d', { willReadFrequently: true });
+            
             isScanning = true; btn.textContent = '停止扫描'; btn.classList.add('stop');
             video.onplaying = () => { scanAnimationId = requestAnimationFrame(tick); };
         } catch (err) {
-            alert("开启相机失败！请确保网页运行在局域网 IP、localhost 或 HTTPS 环境下。");
+            alert("开启相机失败！请检查权限或环境。");
         }
     }
 
@@ -250,25 +248,34 @@
 
     function tick(timestamp) {
         if (!isScanning) return;
-        if (timestamp - lastScanTime < 70) { 
-            scanAnimationId = requestAnimationFrame(tick);
-            return;
-        }
-        lastScanTime = timestamp;
+        // 💡 移除了 70ms 的帧率锁，让浏览器火力全开
 
         const video = document.getElementById('video');
-        const canvasElement = document.getElementById('canvas');
-        const ctx = canvasElement.getContext('2d', { willReadFrequently: true });
 
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            canvasElement.height = video.videoHeight; canvasElement.width = video.videoWidth;
-            ctx.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+            // 💡 核心提速：将 1280x720 画面缩小到 640 宽度再喂给 jsQR
+            // 这让纯 JS 解码器的计算量锐减 70%，速度提升 3 倍以上！
+            const targetWidth = 640; 
+            const targetHeight = Math.floor(video.videoHeight * (targetWidth / video.videoWidth));
+            
+            const decodeCanvas = document.getElementById('canvas');
+            if (decodeCanvas.width !== targetWidth || decodeCanvas.height !== targetHeight) {
+                decodeCanvas.width = targetWidth;
+                decodeCanvas.height = targetHeight;
+            }
+
+            decodeCtx.drawImage(video, 0, 0, targetWidth, targetHeight);
+            
             try {
-                const imageData = ctx.getImageData(0, 0, canvasElement.width, canvasElement.height);
+                const imageData = decodeCtx.getImageData(0, 0, targetWidth, targetHeight);
+                // dontInvert 已经是最优配置，保持不变
                 const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
-                if (code) { parseQRCodeData(code.data); }
+                if (code) { 
+                    parseQRCodeData(code.data); 
+                }
             } catch(e) {}
         }
+        
         scanAnimationId = requestAnimationFrame(tick);
     }
 
@@ -330,7 +337,6 @@
                 if (!receivedChunks[i]) return;
                 fullB64 += receivedChunks[i].trim(); 
             }
-            // 💡 修复致命Bug：移除多余的 escape()，直接解码 URL 编码的 Base64
             const originalText = decodeURIComponent(atob(fullB64));
             document.getElementById('receive-text').value = originalText;
             document.getElementById('receive-status').textContent = '🎉 传输成功！文字已完美无损还原。';
