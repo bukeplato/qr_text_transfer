@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light only">
-    <title>大文本动态二维码传输</title>
+    <title>大文本动态二维码传输 (乒乓回扫终极版)</title>
     <script src="./qrcode.min.js"></script>
     <script src="./jsQR.min.js"></script>
     <style>
@@ -30,10 +30,8 @@
             display: inline-block; 
             box-sizing: border-box;
             color-scheme: light !important; 
-            filter: none !important; 
-            forced-color-adjust: none !important; 
         }
-        #qrcode img, #qrcode canvas { background-color: #ffffff !important; filter: none !important; }
+        #qrcode img, #qrcode canvas { background-color: #ffffff !important; }
 
         #video-container { width: 100%; overflow: hidden; background: black; border-radius: 8px; margin-top: 15px; position: relative; }
         video { width: 100%; height: auto; display: block; }
@@ -46,7 +44,7 @@
 </head>
 <body>
 <div class="container">
-    <h1>🚀 动态二维码传输 (高配硬件防共振版)</h1>
+    <h1>🚀 动态二维码传输 (乒乓回扫终极版)</h1>
     <div class="tabs">
         <div class="tab active" onclick="switchTab('send')">电脑发送端</div>
         <div class="tab" onclick="switchTab('receive')">手机接收端</div>
@@ -112,17 +110,16 @@
         }
     }
 
-    // 💡 修复乱码核心 1：严格的 UTF-8 转 Base64（避免单汉字膨胀 3 倍的问题）
+    // 保留高压缩比编码，防止中文体积膨胀导致二维码太密
     function utf8ToBase64(str) {
         return btoa(unescape(encodeURIComponent(str)));
     }
-    // 💡 修复乱码核心 2：Base64 还原为正规 UTF-8 文本
     function base64ToUtf8(str) {
         return decodeURIComponent(escape(atob(str)));
     }
 
     // ==========================================
-    // 发送端：带轻量级抗共振洗牌的实时引擎
+    // 发送端：乒乓球式回扫（Ping-Pong）
     // ==========================================
     let isSending = false;
     let sendInterval = null;
@@ -140,10 +137,8 @@
         keepAwake();
         const btn = document.getElementById('btn-send');
         const statusEl = document.getElementById('send-status');
-        
         const chunkSize = parseInt(document.getElementById('chunk-size').value) || 250;
         
-        // 使用正确的压缩法，使得二维码体积大幅减小
         const b64Data = utf8ToBase64(text);
         const chunks = [];
         for (let i = 0; i < b64Data.length; i += chunkSize) {
@@ -166,33 +161,29 @@
         const fps = parseInt(document.getElementById('fps').value) || 15;
         const frameDuration = 1000 / fps;
 
-        // 生成初始顺序数组
-        let indices = Array.from({length: total}, (_, i) => i);
-        let pointer = 0;
-        let isFirstRound = true;
+        let currentFrameIndex = 0;
+        let direction = 1; // 1 表示正向，-1 表示反向
 
         sendInterval = setInterval(() => {
-            // 当一轮播放完毕时
-            if (pointer >= total) {
-                pointer = 0;
-                isFirstRound = false;
-                // 💡 破解最后2-3张卡顿：从第二轮开始，用 0.1 毫秒极速打乱数组，彻底击碎屏幕与镜头的刷新率共振死角
-                for (let i = indices.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [indices[i], indices[j]] = [indices[j], indices[i]];
-                }
-            }
-
-            let currentFrameIndex = indices[pointer];
             let payload = `${currentFrameIndex}|${total}|${chunks[currentFrameIndex]}`;
             
             qrEncoder.clear();
             qrEncoder.makeCode(payload);
             
-            let roundText = isFirstRound ? "顺序广播" : "防共振补漏广播";
-            statusEl.textContent = `⚡ [${roundText}] 第 ${currentFrameIndex + 1} / ${total} 页`;
+            let dirText = direction === 1 ? "正向传送" : "反向回扫";
+            statusEl.textContent = `⚡ [${dirText}] 第 ${currentFrameIndex + 1} / ${total} 页`;
             
-            pointer++;
+            // 💡 核心逻辑：乒乓球式碰撞反弹，打破相机与屏幕的固定延迟共振
+            if (total > 1) {
+                currentFrameIndex += direction;
+                if (currentFrameIndex >= total) {
+                    direction = -1; // 碰到底部，改为倒退播
+                    currentFrameIndex = total - 2;
+                } else if (currentFrameIndex < 0) {
+                    direction = 1;  // 碰到头部，改为顺着播
+                    currentFrameIndex = 1;
+                }
+            }
         }, frameDuration);
     }
 
@@ -207,7 +198,7 @@
     }
 
     // ==========================================
-    // 接收端：极速解析
+    // 接收端：全速顺序解析
     // ==========================================
     let isReceiving = false;
     let videoStream = null;
@@ -318,7 +309,6 @@
             for (let i = 0; i < totalChunksCount; i++) {
                 fullB64 += receivedMap.get(i);
             }
-            // 💡 应用正确的还原解码器
             const originalText = base64ToUtf8(fullB64);
             
             document.getElementById('receive-text').value = originalText;
