@@ -1,7 +1,7 @@
 {
-  "name": "动态二维码传输工具",
+  "name": "动态二维码传输",
   "short_name": "二维码传输",
-  "description": "大文本动态二维码离线极速传输工具",
+  "description": "大文本动态二维码传输工具",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
