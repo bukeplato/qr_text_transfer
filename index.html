@@ -1,21 +1,22 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light only">
     <title>大文本动态二维码传输 (极速版)</title>
-    
+
     <!-- ========== PWA 必须的标签 ========== -->
-    <link rel="manifest" href="./lib/manifest.json">
+    <link rel="manifest" href="./manifest.json">
     <meta name="theme-color" content="#2563eb">
     <!-- iOS Safari 支持 -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="二维码传输">
-    <link rel="apple-touch-icon" href="./lib/icon-192.png">
+    <link rel="apple-touch-icon" href="./icons/icon-192.png">
     <!-- ================================= -->
-    
+
     <script src="./lib/qrcode.min.js"></script>
     <script src="./lib/jsQR.min.js"></script>
     <style>
@@ -54,297 +55,303 @@
     </style>
 </head>
 <body>
-<div class="container">
-    <h1>🚀 动态二维码传输 (极速版)</h1>
-    <div class="tabs">
-        <div class="tab active" onclick="switchTab('send')">电脑发送端</div>
-        <div class="tab" onclick="switchTab('receive')">手机接收端</div>
+    <div class="container">
+        <h1>🚀 动态二维码传输 (极速版)</h1>
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('send')">电脑发送端</div>
+            <div class="tab" onclick="switchTab('receive')">手机接收端</div>
+        </div>
+
+        <div id="panel-send" class="panel active">
+            <textarea id="send-text" placeholder="请在此处粘贴需要传输的长文本..."></textarea>
+            <div class="ctrl-group">
+                <label>二维码容错率:</label>
+                <select id="correct-level">
+                    <option value="1" selected>L级 (7% 极速，适合无遮挡)</option>
+                    <option value="0">M级 (15% 均衡推荐)</option>
+                    <option value="3">Q级 (25% 较高可靠)</option>
+                    <option value="2">H级 (30% 极强，点阵最密)</option>
+                </select>
+            </div>
+            <div class="ctrl-group">
+                <label>单页字符 (推荐 250-300):</label>
+                <input type="number" id="chunk-size" value="250" min="50" max="800">
+            </div>
+            <div class="ctrl-group">
+                <label>闪烁速度 (FPS):</label>
+                <input type="number" id="fps" value="15" min="1" max="60">
+            </div>
+            <button id="btn-send" onclick="toggleSend()">⚡ 立即生成并循环闪烁</button>
+            <div id="qr-container">
+                <div id="qrcode"></div>
+            </div>
+            <div id="send-status" class="status">未开始</div>
+        </div>
+
+        <div id="panel-receive" class="panel">
+            <button id="btn-receive" onclick="toggleReceive()">📸 开启极速扫描</button>
+            <div id="video-container">
+                <video id="video" playsinline></video>
+                <canvas id="canvas" style="display:none;"></canvas>
+            </div>
+            <div class="progress-bar">
+                <div id="progress-fill" class="progress-fill"></div>
+            </div>
+            <div id="receive-status" class="status">等待开始...</div>
+            <textarea id="receive-text" placeholder="接收完成后，完整文本会直接显示在这里..." readonly
+                style="margin-top:15px; background:#f9fafb; height: 180px;"></textarea>
+            <button id="btn-copy" onclick="copyResult()" style="background:#10b981; display:none;">一键复制完整文本</button>
+        </div>
     </div>
 
-    <div id="panel-send" class="panel active">
-        <textarea id="send-text" placeholder="请在此处粘贴需要传输的长文本..."></textarea>
-        <div class="ctrl-group">
-            <label>二维码容错率:</label>
-            <select id="correct-level">
-                <option value="1" selected>L级 (7% 极速，适合无遮挡)</option>
-                <option value="0">M级 (15% 均衡推荐)</option>
-                <option value="3">Q级 (25% 较高可靠)</option>
-                <option value="2">H级 (30% 极强，点阵最密)</option>
-            </select>
-        </div>
-        <div class="ctrl-group">
-            <label>单页字符 (推荐 250-300):</label>
-            <input type="number" id="chunk-size" value="250" min="50" max="800">
-        </div>
-        <div class="ctrl-group">
-            <label>闪烁速度 (FPS):</label>
-            <input type="number" id="fps" value="15" min="1" max="60">
-        </div>
-        <button id="btn-send" onclick="toggleSend()">⚡ 立即生成并循环闪烁</button>
-        <div id="qr-container"><div id="qrcode"></div></div>
-        <div id="send-status" class="status">未开始</div>
-    </div>
-
-    <div id="panel-receive" class="panel">
-        <button id="btn-receive" onclick="toggleReceive()">📸 开启极速扫描</button>
-        <div id="video-container">
-            <video id="video" playsinline></video>
-            <canvas id="canvas" style="display:none;"></canvas>
-        </div>
-        <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
-        <div id="receive-status" class="status">等待开始...</div>
-        <textarea id="receive-text" placeholder="接收完成后，完整文本会直接显示在这里..." readonly style="margin-top:15px; background:#f9fafb; height: 180px;"></textarea>
-        <button id="btn-copy" onclick="copyResult()" style="background:#10b981; display:none;">一键复制完整文本</button>
-    </div>
-</div>
-
-<script>
-    // ==================== 注册 Service Worker（PWA 核心） ====================
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .then(registration => {
-            console.log('✅ Service Worker 注册成功');
-          })
-          .catch(err => {
-            console.log('❌ Service Worker 注册失败: ', err);
-          });
-      });
-    }
-    // ====================================================================
-
-    let wakeLock = null;
-    async function keepAwake() {
-        try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
-    }
-    function releaseAwake() {
-        if (wakeLock !== null) wakeLock.release().then(() => wakeLock = null);
-    }
-
-    function switchTab(type) {
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-        if(type === 'send') {
-            document.querySelectorAll('.tab')[0].classList.add('active');
-            document.getElementById('panel-send').classList.add('active');
-            stopReceive();
-        } else {
-            document.querySelectorAll('.tab')[1].classList.add('active');
-            document.getElementById('panel-receive').classList.add('active');
-            stopSend();
-        }
-    }
-
-    function utf8ToBase64(str) {
-        return btoa(unescape(encodeURIComponent(str)));
-    }
-    function base64ToUtf8(str) {
-        return decodeURIComponent(escape(atob(str)));
-    }
-
-    let isSending = false;
-    let sendInterval = null;
-    let qrEncoder = null;
-
-    function toggleSend() {
-        if (isSending) stopSend();
-        else startSend();
-    }
-
-    function startSend() {
-        const text = document.getElementById('send-text').value.trim();
-        if (!text) { alert('请先粘贴文本！'); return; }
-
-        keepAwake();
-        const btn = document.getElementById('btn-send');
-        const statusEl = document.getElementById('send-status');
-        const chunkSize = parseInt(document.getElementById('chunk-size').value) || 250;
-        
-        const b64Data = utf8ToBase64(text);
-        const chunks = [];
-        for (let i = 0; i < b64Data.length; i += chunkSize) {
-            chunks.push(b64Data.substring(i, i + chunkSize));
-        }
-        const total = chunks.length;
-
-        document.getElementById('qrcode').innerHTML = '';
-        const levelVal = parseInt(document.getElementById('correct-level').value);
-        qrEncoder = new QRCode(document.getElementById("qrcode"), { 
-            width: 320,  
-            height: 320, 
-            correctLevel: levelVal 
-        });
-
-        isSending = true;
-        btn.textContent = '⏹ 停止闪烁';
-        btn.classList.add('stop');
-        
-        const fps = parseInt(document.getElementById('fps').value) || 15;
-        const frameDuration = 1000 / fps;
-
-        let currentFrameIndex = 0;
-        let direction = 1;
-
-        sendInterval = setInterval(() => {
-            let payload = `${currentFrameIndex}|${total}|${chunks[currentFrameIndex]}`;
-            
-            qrEncoder.clear();
-            qrEncoder.makeCode(payload);
-            
-            let dirText = direction === 1 ? "正向传送" : "反向回扫";
-            statusEl.textContent = `⚡ [${dirText}] 第 ${currentFrameIndex + 1} / ${total} 页`;
-            
-            if (total > 1) {
-                currentFrameIndex += direction;
-                if (currentFrameIndex >= total) {
-                    direction = -1;
-                    currentFrameIndex = total - 2;
-                } else if (currentFrameIndex < 0) {
-                    direction = 1;
-                    currentFrameIndex = 1;
-                }
-            }
-        }, frameDuration);
-    }
-
-    function stopSend() {
-        isSending = false;
-        if (sendInterval) clearInterval(sendInterval);
-        releaseAwake();
-        const btn = document.getElementById('btn-send');
-        btn.textContent = '⚡ 立即生成并循环闪烁';
-        btn.classList.remove('stop');
-        document.getElementById('send-status').textContent = '已停止';
-    }
-
-    let isReceiving = false;
-    let videoStream = null;
-    let receiveAnimationId = null;
-    let receivedMap = new Map(); 
-    let totalChunksCount = 0;
-
-    async function toggleReceive() {
-        if (isReceiving) stopReceive();
-        else startReceive();
-    }
-
-    async function startReceive() {
-        const video = document.getElementById('video');
-        const btn = document.getElementById('btn-receive');
-        
-        receivedMap.clear();
-        totalChunksCount = 0;
-        document.getElementById('receive-text').value = '';
-        document.getElementById('btn-copy').style.display = 'none';
-        document.getElementById('progress-fill').style.width = '0%';
-        keepAwake();
-
-        try {
-            videoStream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "environment" } 
+    <script>
+        // ==================== 注册 Service Worker（PWA 核心） ====================
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(registration => {
+                        console.log('✅ Service Worker 注册成功');
+                    })
+                    .catch(err => {
+                        console.log('❌ Service Worker 注册失败: ', err);
+                    });
             });
-            video.srcObject = videoStream;
-            video.setAttribute("playsinline", true);
-            video.play();
-            
-            isReceiving = true;
-            btn.textContent = '⏹ 停止扫描';
+        }
+        // ====================================================================
+
+        let wakeLock = null;
+        async function keepAwake() {
+            try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) { }
+        }
+        function releaseAwake() {
+            if (wakeLock !== null) wakeLock.release().then(() => wakeLock = null);
+        }
+
+        function switchTab(type) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            if (type === 'send') {
+                document.querySelectorAll('.tab')[0].classList.add('active');
+                document.getElementById('panel-send').classList.add('active');
+                stopReceive();
+            } else {
+                document.querySelectorAll('.tab')[1].classList.add('active');
+                document.getElementById('panel-receive').classList.add('active');
+                stopSend();
+            }
+        }
+
+        function utf8ToBase64(str) {
+            return btoa(unescape(encodeURIComponent(str)));
+        }
+        function base64ToUtf8(str) {
+            return decodeURIComponent(escape(atob(str)));
+        }
+
+        let isSending = false;
+        let sendInterval = null;
+        let qrEncoder = null;
+
+        function toggleSend() {
+            if (isSending) stopSend();
+            else startSend();
+        }
+
+        function startSend() {
+            const text = document.getElementById('send-text').value.trim();
+            if (!text) { alert('请先粘贴文本！'); return; }
+
+            keepAwake();
+            const btn = document.getElementById('btn-send');
+            const statusEl = document.getElementById('send-status');
+            const chunkSize = parseInt(document.getElementById('chunk-size').value) || 250;
+
+            const b64Data = utf8ToBase64(text);
+            const chunks = [];
+            for (let i = 0; i < b64Data.length; i += chunkSize) {
+                chunks.push(b64Data.substring(i, i + chunkSize));
+            }
+            const total = chunks.length;
+
+            document.getElementById('qrcode').innerHTML = '';
+            const levelVal = parseInt(document.getElementById('correct-level').value);
+            qrEncoder = new QRCode(document.getElementById("qrcode"), {
+                width: 320,
+                height: 320,
+                correctLevel: levelVal
+            });
+
+            isSending = true;
+            btn.textContent = '⏹ 停止闪烁';
             btn.classList.add('stop');
-            
-            video.onplaying = () => { receiveAnimationId = requestAnimationFrame(scanTick); };
-        } catch (err) {
-            alert("开启相机失败，请检查权限。");
-        }
-    }
 
-    function stopReceive() {
-        isReceiving = false;
-        releaseAwake();
-        if (receiveAnimationId) cancelAnimationFrame(receiveAnimationId);
-        if (videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; }
-        
-        const btn = document.getElementById('btn-receive');
-        btn.textContent = '📸 开启极速扫描';
-        btn.classList.remove('stop');
-    }
+            const fps = parseInt(document.getElementById('fps').value) || 15;
+            const frameDuration = 1000 / fps;
 
-    function scanTick() {
-        if (!isReceiving) return;
+            let currentFrameIndex = 0;
+            let direction = 1;
 
-        const video = document.getElementById('video');
-        const canvasElement = document.getElementById('canvas');
-        const ctx = canvasElement.getContext('2d', { willReadFrequently: true });
+            sendInterval = setInterval(() => {
+                let payload = `${currentFrameIndex}|${total}|${chunks[currentFrameIndex]}`;
 
-        if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            canvasElement.width = video.videoWidth;
-            canvasElement.height = video.videoHeight;
-            
-            ctx.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
-            try {
-                const imageData = ctx.getImageData(0, 0, canvasElement.width, canvasElement.height);
-                const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
-                if (code && code.data) {
-                    processQRCodeFast(code.data);
+                qrEncoder.clear();
+                qrEncoder.makeCode(payload);
+
+                let dirText = direction === 1 ? "正向传送" : "反向回扫";
+                statusEl.textContent = `⚡ [${dirText}] 第 ${currentFrameIndex + 1} / ${total} 页`;
+
+                if (total > 1) {
+                    currentFrameIndex += direction;
+                    if (currentFrameIndex >= total) {
+                        direction = -1;
+                        currentFrameIndex = total - 2;
+                    } else if (currentFrameIndex < 0) {
+                        direction = 1;
+                        currentFrameIndex = 1;
+                    }
                 }
-            } catch(e) {}
+            }, frameDuration);
         }
-        receiveAnimationId = requestAnimationFrame(scanTick);
-    }
 
-    function processQRCodeFast(rawData) {
-        const firstPipe = rawData.indexOf('|');
-        const secondPipe = rawData.indexOf('|', firstPipe + 1);
-        if (firstPipe === -1 || secondPipe === -1) return;
+        function stopSend() {
+            isSending = false;
+            if (sendInterval) clearInterval(sendInterval);
+            releaseAwake();
+            const btn = document.getElementById('btn-send');
+            btn.textContent = '⚡ 立即生成并循环闪烁';
+            btn.classList.remove('stop');
+            document.getElementById('send-status').textContent = '已停止';
+        }
 
-        const index = parseInt(rawData.substring(0, firstPipe));
-        const total = parseInt(rawData.substring(firstPipe + 1, secondPipe));
-        const payload = rawData.substring(secondPipe + 1);
+        let isReceiving = false;
+        let videoStream = null;
+        let receiveAnimationId = null;
+        let receivedMap = new Map();
+        let totalChunksCount = 0;
 
-        if (isNaN(index) || isNaN(total)) return;
-        if (totalChunksCount === 0) totalChunksCount = total;
+        async function toggleReceive() {
+            if (isReceiving) stopReceive();
+            else startReceive();
+        }
 
-        if (!receivedMap.has(index)) {
-            receivedMap.set(index, payload);
-            
-            const percent = (receivedMap.size / totalChunksCount) * 100;
-            document.getElementById('progress-fill').style.width = percent + '%';
-            document.getElementById('receive-status').textContent = `全速接收: ${receivedMap.size} / ${totalChunksCount}`;
-            
-            if (receivedMap.size === totalChunksCount) {
-                finishTransfer();
+        async function startReceive() {
+            const video = document.getElementById('video');
+            const btn = document.getElementById('btn-receive');
+
+            receivedMap.clear();
+            totalChunksCount = 0;
+            document.getElementById('receive-text').value = '';
+            document.getElementById('btn-copy').style.display = 'none';
+            document.getElementById('progress-fill').style.width = '0%';
+            keepAwake();
+
+            try {
+                videoStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: "environment" }
+                });
+                video.srcObject = videoStream;
+                video.setAttribute("playsinline", true);
+                video.play();
+
+                isReceiving = true;
+                btn.textContent = '⏹ 停止扫描';
+                btn.classList.add('stop');
+
+                video.onplaying = () => { receiveAnimationId = requestAnimationFrame(scanTick); };
+            } catch (err) {
+                alert("开启相机失败，请检查权限。");
             }
         }
-    }
 
-    function finishTransfer() {
-        stopReceive();
-        try {
-            let fullB64 = '';
-            for (let i = 0; i < totalChunksCount; i++) {
-                fullB64 += receivedMap.get(i);
-            }
-            const originalText = base64ToUtf8(fullB64);
-            
-            document.getElementById('receive-text').value = originalText;
-            document.getElementById('receive-status').textContent = '🎉 传输成功！文字已无损还原。';
-            document.getElementById('btn-copy').style.display = 'block';
-        } catch (e) {
-            document.getElementById('receive-status').textContent = '❌ 数据还原失败，请重试。';
+        function stopReceive() {
+            isReceiving = false;
+            releaseAwake();
+            if (receiveAnimationId) cancelAnimationFrame(receiveAnimationId);
+            if (videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; }
+
+            const btn = document.getElementById('btn-receive');
+            btn.textContent = '📸 开启极速扫描';
+            btn.classList.remove('stop');
         }
-    }
 
-    function copyResult() {
-        const txt = document.getElementById('receive-text');
-        if (!txt.value) return;
-        txt.select();
-        navigator.clipboard.writeText(txt.value).then(() => {
-            const btn = document.getElementById('btn-copy');
-            const originalText = btn.textContent;
-            btn.textContent = '✅ 复制成功！';
-            btn.style.background = '#059669'; 
-            setTimeout(() => { btn.textContent = originalText; btn.style.background = '#10b981'; }, 1500);
-        }).catch(() => { alert("复制失败，请手动全选复制。"); });
-    }
-</script>
+        function scanTick() {
+            if (!isReceiving) return;
+
+            const video = document.getElementById('video');
+            const canvasElement = document.getElementById('canvas');
+            const ctx = canvasElement.getContext('2d', { willReadFrequently: true });
+
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                canvasElement.width = video.videoWidth;
+                canvasElement.height = video.videoHeight;
+
+                ctx.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+                try {
+                    const imageData = ctx.getImageData(0, 0, canvasElement.width, canvasElement.height);
+                    const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+                    if (code && code.data) {
+                        processQRCodeFast(code.data);
+                    }
+                } catch (e) { }
+            }
+            receiveAnimationId = requestAnimationFrame(scanTick);
+        }
+
+        function processQRCodeFast(rawData) {
+            const firstPipe = rawData.indexOf('|');
+            const secondPipe = rawData.indexOf('|', firstPipe + 1);
+            if (firstPipe === -1 || secondPipe === -1) return;
+
+            const index = parseInt(rawData.substring(0, firstPipe));
+            const total = parseInt(rawData.substring(firstPipe + 1, secondPipe));
+            const payload = rawData.substring(secondPipe + 1);
+
+            if (isNaN(index) || isNaN(total)) return;
+            if (totalChunksCount === 0) totalChunksCount = total;
+
+            if (!receivedMap.has(index)) {
+                receivedMap.set(index, payload);
+
+                const percent = (receivedMap.size / totalChunksCount) * 100;
+                document.getElementById('progress-fill').style.width = percent + '%';
+                document.getElementById('receive-status').textContent = `全速接收: ${receivedMap.size} / ${totalChunksCount}`;
+
+                if (receivedMap.size === totalChunksCount) {
+                    finishTransfer();
+                }
+            }
+        }
+
+        function finishTransfer() {
+            stopReceive();
+            try {
+                let fullB64 = '';
+                for (let i = 0; i < totalChunksCount; i++) {
+                    fullB64 += receivedMap.get(i);
+                }
+                const originalText = base64ToUtf8(fullB64);
+
+                document.getElementById('receive-text').value = originalText;
+                document.getElementById('receive-status').textContent = '🎉 传输成功！文字已无损还原。';
+                document.getElementById('btn-copy').style.display = 'block';
+            } catch (e) {
+                document.getElementById('receive-status').textContent = '❌ 数据还原失败，请重试。';
+            }
+        }
+
+        function copyResult() {
+            const txt = document.getElementById('receive-text');
+            if (!txt.value) return;
+            txt.select();
+            navigator.clipboard.writeText(txt.value).then(() => {
+                const btn = document.getElementById('btn-copy');
+                const originalText = btn.textContent;
+                btn.textContent = '✅ 复制成功！';
+                btn.style.background = '#059669';
+                setTimeout(() => { btn.textContent = originalText; btn.style.background = '#10b981'; }, 1500);
+            }).catch(() => { alert("复制失败，请手动全选复制。"); });
+        }
+    </script>
 </body>
+
 </html>

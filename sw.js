@@ -1,9 +1,13 @@
-const CACHE_NAME = 'qrcode-transfer-v2';
+const CACHE_NAME = 'qrcode-transfer-v3';
 
 const ASSETS = [
   './',
+  './index.html',
+  './manifest.json',       // 已经回到了根目录
   './lib/qrcode.min.js',
-  './lib/jsQR.min.js'
+  './lib/jsQR.min.js',
+  './icons/icon-192.png',  // 指向新的 icons 目录
+  './icons/icon-512.png'   // 指向新的 icons 目录
 ];
 
 self.addEventListener('install', event => {
@@ -19,7 +23,7 @@ self.addEventListener('activate', event => {
     caches.keys().then(keys => {
       return Promise.all(
         keys.filter(key => key !== CACHE_NAME)
-            .map(key => caches.delete(key))
+          .map(key => caches.delete(key))
       );
     })
   );
@@ -39,7 +43,7 @@ self.addEventListener('fetch', event => {
           });
         }
         return response;
-      }).catch(() => {});
+      }).catch(() => { });
     })
   );
 });
