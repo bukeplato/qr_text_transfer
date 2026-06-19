@@ -4,9 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light only">
-    <title>大文本动态二维码传输 (解封极速版)</title>
-    <script src="./qrcode.min.js"></script>
-    <script src="./jsQR.min.js"></script>
+    <title>大文本动态二维码传输 (极速版)</title>
+    
+    <!-- ========== PWA 必须的标签 ========== -->
+    <link rel="manifest" href="./lib/manifest.json">
+    <meta name="theme-color" content="#2563eb">
+    <!-- iOS Safari 支持 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="二维码传输">
+    <link rel="apple-touch-icon" href="./lib/icon-192.png">
+    <!-- ================================= -->
+    
+    <script src="./lib/qrcode.min.js"></script>
+    <script src="./lib/jsQR.min.js"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f3f4f6; margin: 0; padding: 15px; color: #1f2937; }
         .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
@@ -44,7 +55,7 @@
 </head>
 <body>
 <div class="container">
-    <h1>🚀 动态二维码传输 (解封极速版)</h1>
+    <h1>🚀 动态二维码传输 (极速版)</h1>
     <div class="tabs">
         <div class="tab active" onclick="switchTab('send')">电脑发送端</div>
         <div class="tab" onclick="switchTab('receive')">手机接收端</div>
@@ -88,6 +99,20 @@
 </div>
 
 <script>
+    // ==================== 注册 Service Worker（PWA 核心） ====================
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(registration => {
+            console.log('✅ Service Worker 注册成功');
+          })
+          .catch(err => {
+            console.log('❌ Service Worker 注册失败: ', err);
+          });
+      });
+    }
+    // ====================================================================
+
     let wakeLock = null;
     async function keepAwake() {
         try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
@@ -110,7 +135,6 @@
         }
     }
 
-    // 高压缩比编码，防止中文体积膨胀导致二维码太密
     function utf8ToBase64(str) {
         return btoa(unescape(encodeURIComponent(str)));
     }
@@ -118,9 +142,6 @@
         return decodeURIComponent(escape(atob(str)));
     }
 
-    // ==========================================
-    // 发送端：乒乓球式回扫引擎（防共振）
-    // ==========================================
     let isSending = false;
     let sendInterval = null;
     let qrEncoder = null;
@@ -196,9 +217,6 @@
         document.getElementById('send-status').textContent = '已停止';
     }
 
-    // ==========================================
-    // 接收端：解除约束，硬件直通
-    // ==========================================
     let isReceiving = false;
     let videoStream = null;
     let receiveAnimationId = null;
@@ -222,7 +240,6 @@
         keepAwake();
 
         try {
-            // 【修改点 1】彻底解除分辨率枷锁，让 iOS 决定最省电、最流畅、对焦最好的原生原生分辨率
             videoStream = await navigator.mediaDevices.getUserMedia({ 
                 video: { facingMode: "environment" } 
             });
@@ -259,7 +276,6 @@
         const ctx = canvasElement.getContext('2d', { willReadFrequently: true });
 
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            // 【修改点 2】去掉强行压缩。原生直通，1:1 绘制，保证边缘像素绝不模糊
             canvasElement.width = video.videoWidth;
             canvasElement.height = video.videoHeight;
             
