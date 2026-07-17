@@ -33,15 +33,15 @@
         button:hover { background: #1d4ed8; }
         button.stop { background: #dc2626; }
         button.stop:hover { background: #b91c1c; }
-        
+
         #qr-container { display: flex; justify-content: center; align-items: center; margin-top: 15px; min-height: 300px; background: #f9fafb; border-radius: 8px; border: 1px dashed #d1d5db; padding: 10px; }
-        #qrcode { 
-            background-color: #ffffff !important; 
-            padding: 16px !important; 
-            border-radius: 8px; 
-            display: inline-block; 
+        #qrcode {
+            background-color: #ffffff !important;
+            padding: 16px !important;
+            border-radius: 8px;
+            display: inline-block;
             box-sizing: border-box;
-            color-scheme: light !important; 
+            color-scheme: light !important;
         }
         #qrcode img, #qrcode canvas { background-color: #ffffff !important; }
 
@@ -50,16 +50,18 @@
         .progress-bar { height: 8px; background: #e5e7eb; border-radius: 4px; margin-top: 15px; overflow: hidden; }
         .progress-fill { height: 100%; background: #10b981; width: 0%; transition: width 0.1s; }
         .status { text-align: center; margin-top: 8px; font-size: 14px; font-weight: bold; color: #4b5563; }
+        .status .sub { font-weight: normal; color: #6b7280; font-size: 12px; }
         .ctrl-group { margin: 10px 0; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
         .ctrl-group input, .ctrl-group select { width: 130px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; text-align: center; font-size: 13px; }
+        .ctrl-group label input[type="checkbox"] { width: auto; margin-left: 6px; vertical-align: middle; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🚀 动态二维码传输 (极速版)</h1>
         <div class="tabs">
-            <div class="tab active" onclick="switchTab('send')">电脑发送端</div>
-            <div class="tab" onclick="switchTab('receive')">手机接收端</div>
+            <div class="tab" onclick="switchTab('send')">电脑发送端</div>
+            <div class="tab active" onclick="switchTab('receive')">手机接收端</div>
         </div>
 
         <div id="panel-send" class="panel active">
@@ -79,7 +81,11 @@
             </div>
             <div class="ctrl-group">
                 <label>闪烁速度 (FPS):</label>
-                <input type="number" id="fps" value="15" min="1" max="60">
+                <input type="number" id="fps" value="20" min="1" max="30">
+            </div>
+            <div class="ctrl-group">
+                <label>🧪 喷泉码模式 (丢帧自动补齐):</label>
+                <input type="checkbox" id="fountain-mode">
             </div>
             <button id="btn-send" onclick="toggleSend()">⚡ 立即生成并循环闪烁</button>
             <div id="qr-container">
@@ -91,7 +97,7 @@
         <div id="panel-receive" class="panel">
             <button id="btn-receive" onclick="toggleReceive()">📸 开启极速扫描</button>
             <div id="video-container">
-                <video id="video" playsinline></video>
+                <video id="video" playsinline muted></video>
                 <canvas id="canvas" style="display:none;"></canvas>
             </div>
             <div class="progress-bar">
@@ -100,7 +106,7 @@
             <div id="receive-status" class="status">等待开始...</div>
             <textarea id="receive-text" placeholder="接收完成后，完整文本会直接显示在这里..." readonly
                 style="margin-top:15px; background:#f9fafb; height: 180px;"></textarea>
-            <button id="btn-copy" onclick="copyResult()" style="background:#10b981; display:none;">一键复制完整文本</button>
+            <button id="btn-copy" onclick="copyResult()" style="background:#10b981; display:none;">📋 一键复制完整文本</button>
         </div>
     </div>
 
@@ -110,26 +116,253 @@
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
                     .then(registration => {
-                        console.log('✅ Service Worker 注册成功');
+                        console.log('Service Worker 注册成功');
                     })
                     .catch(err => {
-                        console.log('❌ Service Worker 注册失败: ', err);
+                        console.log('Service Worker 注册失败: ', err);
                     });
             });
         }
         // ====================================================================
 
-        let wakeLock = null;
-        async function keepAwake() {
-            try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) { }
+        // ==================== 核心逻辑 ====================
+
+        // ---------- 工具：UTF-8 / Base64 ----------
+        function utf8ToBase64(str) {
+            var bytes = new TextEncoder().encode(str);
+            var bin = '';
+            for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+            return btoa(bin);
         }
-        function releaseAwake() {
-            if (wakeLock !== null) wakeLock.release().then(() => wakeLock = null);
+        function base64ToUtf8(b64) {
+            var bin = atob(b64);
+            var bytes = new Uint8Array(bin.length);
+            for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+        }
+        function bytesToBase64(bytes) {
+            var bin = '';
+            for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+            return btoa(bin);
+        }
+        function base64ToBytes(b64) {
+            var bin = atob(b64);
+            var bytes = new Uint8Array(bin.length);
+            for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            return bytes;
         }
 
+        // ---------- 工具：gzip 压缩 ----------
+        var COMPRESSION_SUPPORTED = typeof CompressionStream === 'function' && typeof DecompressionStream === 'function';
+        function gzipCompress(bytes) {
+            return new Promise(function(resolve) {
+                var cs = new CompressionStream('gzip');
+                var r = new Response(new Blob([bytes]).stream().pipeThrough(cs));
+                r.arrayBuffer().then(function(buf) { resolve(new Uint8Array(buf)); });
+            });
+        }
+        function gzipDecompress(bytes) {
+            return new Promise(function(resolve) {
+                var ds = new DecompressionStream('gzip');
+                var r = new Response(new Blob([bytes]).stream().pipeThrough(ds));
+                r.arrayBuffer().then(function(buf) { resolve(new Uint8Array(buf)); });
+            });
+        }
+
+        // ---------- CRC32 ----------
+        var CRC_TABLE = (function() {
+            var t = new Uint32Array(256);
+            for (var n = 0; n < 256; n++) {
+                var c = n;
+                for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+                t[n] = c >>> 0;
+            }
+            return t;
+        })();
+        function crc32(bytes) {
+            var c = 0xFFFFFFFF;
+            for (var i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+            return (c ^ 0xFFFFFFFF) >>> 0;
+        }
+
+        // ---------- 数据准备 ----------
+        function prepareData(text) {
+            return new Promise(function(resolve) {
+                if (COMPRESSION_SUPPORTED) {
+                    var raw = new TextEncoder().encode(text);
+                    gzipCompress(raw).then(function(compressed) {
+                        if (compressed.length < raw.length) {
+                            resolve({ b64: bytesToBase64(compressed), flag: 1 });
+                        } else {
+                            resolve({ b64: utf8ToBase64(text), flag: 0 });
+                        }
+                    }).catch(function() {
+                        resolve({ b64: utf8ToBase64(text), flag: 0 });
+                    });
+                } else {
+                    resolve({ b64: utf8ToBase64(text), flag: 0 });
+                }
+            });
+        }
+        function restoreData(b64, flag) {
+            if (flag === 1) {
+                return gzipDecompress(base64ToBytes(b64)).then(function(dec) {
+                    return new TextDecoder('utf-8', { fatal: true }).decode(dec);
+                });
+            }
+            return Promise.resolve(base64ToUtf8(b64));
+        }
+
+        // ---------- 会话 ID ----------
+        function makeSid(b64) {
+            var h = 0x811c9dc5;
+            for (var i = 0; i < b64.length; i++) {
+                h ^= b64.charCodeAt(i);
+                h = Math.imul(h, 0x01000193);
+            }
+            return (h >>> 0).toString(36);
+        }
+
+        // ---------- PRNG ----------
+        function mulberry32(seed) {
+            var a = seed >>> 0;
+            return function() {
+                a |= 0; a = (a + 0x6D2B79F5) | 0;
+                var t = Math.imul(a ^ (a >>> 15), 1 | a);
+                t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+                return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+            };
+        }
+
+        // ---------- LT 喷泉码 ----------
+        function sampleDegree(rng, K) {
+            var u = rng();
+            var d = Math.floor(1 / u);
+            if (d > K) d = K;
+            if (d > 1 && rng() < 0.1) d = 2 + Math.floor(rng() * Math.min(K - 1, 9));
+            return Math.max(1, Math.min(K, d));
+        }
+        function pickIndices(seed, K) {
+            var rng = mulberry32(seed);
+            var degree = sampleDegree(rng, K);
+            var idxSet = {};
+            var cnt = 0;
+            while (cnt < degree) {
+                var idx = Math.floor(rng() * K);
+                if (!idxSet[idx]) { idxSet[idx] = true; cnt++; }
+            }
+            return Object.keys(idxSet).map(Number);
+        }
+        function padChunks(chunks) {
+            var maxLen = 0;
+            for (var i = 0; i < chunks.length; i++) { if (chunks[i].length > maxLen) maxLen = chunks[i].length; }
+            return chunks.map(function(c) { return c.length < maxLen ? c + ' '.repeat(maxLen - c.length) : c; });
+        }
+        function fountainEmit(paddedChunks, K, seq) {
+            var idxs = seq < K ? [seq] : pickIndices(seq, K);
+            var data = paddedChunks[idxs[0]];
+            for (var i = 1; i < idxs.length; i++) {
+                data = xorStr(data, paddedChunks[idxs[i]]);
+            }
+            return { seed: seq, data: data };
+        }
+        function FountainDecoder(K) {
+            this.K = K;
+            this.solved = new Array(K).fill(null);
+            this.pending = [];
+            this.done = false;
+        }
+        FountainDecoder.prototype.solvedCount = function() {
+            var n = 0;
+            for (var i = 0; i < this.K; i++) if (this.solved[i] !== null) n++;
+            return n;
+        };
+        FountainDecoder.prototype.addFrame = function(seed, data) {
+            if (this.done) return;
+            var idxs = seed < this.K ? [seed] : pickIndices(seed, this.K);
+            var idxSet = {};
+            for (var i = 0; i < idxs.length; i++) idxSet[idxs[i]] = true;
+            var solved = this.solved;
+            var rmKeys = [];
+            for (var k in idxSet) {
+                var ki = Number(k);
+                if (solved[ki] !== null) {
+                    data = xorStr(data, solved[ki]);
+                    rmKeys.push(ki);
+                }
+            }
+            for (var i = 0; i < rmKeys.length; i++) delete idxSet[rmKeys[i]];
+            var keys = Object.keys(idxSet);
+            if (keys.length === 0) return;
+            this.pending.push({ idxSet: idxSet, data: data });
+            this.peel();
+            if (this.solvedCount() === this.K) { this.done = true; this.pending = []; }
+        };
+        FountainDecoder.prototype.peel = function() {
+            var progressed = true;
+            var self = this;
+            while (progressed) {
+                progressed = false;
+                for (var i = self.pending.length - 1; i >= 0; i--) {
+                    var keys = Object.keys(self.pending[i].idxSet);
+                    if (keys.length === 1) {
+                        var idx = Number(keys[0]);
+                        var data = self.pending[i].data;
+                        self.pending.splice(i, 1);
+                        if (self.solved[idx] === null) {
+                            self.solved[idx] = data;
+                            for (var j = 0; j < self.pending.length; j++) {
+                                if (self.pending[j].idxSet[idx]) {
+                                    self.pending[j].data = xorStr(self.pending[j].data, data);
+                                    delete self.pending[j].idxSet[idx];
+                                }
+                            }
+                        }
+                        progressed = true;
+                    }
+                }
+            }
+        };
+        function xorStr(a, b) {
+            var out = '';
+            for (var j = 0; j < a.length; j++) out += String.fromCharCode(a.charCodeAt(j) ^ b.charCodeAt(j));
+            return out;
+        }
+
+        // ---------- 帧格式 ----------
+        function packFrame(sid, flag, seed, total, size, crc, payload) {
+            return sid + '|' + flag + '|' + seed + '|' + total + '|' + size + '|' + crc + '|' + payload;
+        }
+        function parseFrame(raw) {
+            if (!raw || typeof raw !== 'string') return null;
+            if (raw.length > 4000) return null;
+            var count = 0;
+            var pos = [];
+            for (var i = 0; i < raw.length && count < 6; i++) {
+                if (raw.charCodeAt(i) === 124) { pos.push(i); count++; }
+            }
+            if (pos.length < 6) return null;
+            var sid = raw.substring(0, pos[0]);
+            var flag = parseInt(raw.substring(pos[0] + 1, pos[1]), 10);
+            var seed = parseInt(raw.substring(pos[1] + 1, pos[2]), 10);
+            var total = parseInt(raw.substring(pos[2] + 1, pos[3]), 10);
+            var size = parseInt(raw.substring(pos[3] + 1, pos[4]), 10);
+            var crc = parseInt(raw.substring(pos[4] + 1, pos[5]), 10);
+            var payload = raw.substring(pos[5] + 1);
+            if (!sid || sid.length > 12) return null;
+            if (!(flag >= 0 && flag <= 3)) return null;
+            if (isNaN(seed) || seed < 0 || seed > 1e9) return null;
+            if (isNaN(total) || total < 1 || total > 100000) return null;
+            if (isNaN(size) || size < 1 || size > 1e8) return null;
+            if (isNaN(crc) || crc < 0 || crc > 4294967295) return null;
+            return { sid: sid, flag: flag, seed: seed, total: total, size: size, crc: crc, payload: payload };
+        }
+
+        // ==================== 核心逻辑结束 ====================
+
         function switchTab(type) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+            document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('active'); });
             if (type === 'send') {
                 document.querySelectorAll('.tab')[0].classList.add('active');
                 document.getElementById('panel-send').classList.add('active');
@@ -141,16 +374,16 @@
             }
         }
 
-        function utf8ToBase64(str) {
-            return btoa(unescape(encodeURIComponent(str)));
-        }
-        function base64ToUtf8(str) {
-            return decodeURIComponent(escape(atob(str)));
+        function clampInt(value, min, max, fallback) {
+            var n = parseInt(value, 10);
+            if (isNaN(n)) return fallback;
+            return Math.min(max, Math.max(min, n));
         }
 
-        let isSending = false;
-        let sendInterval = null;
-        let qrEncoder = null;
+        // ==================== 发送端 ====================
+        var isSending = false;
+        var sendRafId = null;
+        var qrEncoder = null;
 
         function toggleSend() {
             if (isSending) stopSend();
@@ -158,200 +391,295 @@
         }
 
         function startSend() {
-            const text = document.getElementById('send-text').value.trim();
+            var text = document.getElementById('send-text').value.trim();
             if (!text) { alert('请先粘贴文本！'); return; }
 
-            keepAwake();
-            const btn = document.getElementById('btn-send');
-            const statusEl = document.getElementById('send-status');
-            const chunkSize = parseInt(document.getElementById('chunk-size').value) || 250;
-
-            const b64Data = utf8ToBase64(text);
-            const chunks = [];
-            for (let i = 0; i < b64Data.length; i += chunkSize) {
-                chunks.push(b64Data.substring(i, i + chunkSize));
-            }
-            const total = chunks.length;
-
-            document.getElementById('qrcode').innerHTML = '';
-            const levelVal = parseInt(document.getElementById('correct-level').value);
-            qrEncoder = new QRCode(document.getElementById("qrcode"), {
-                width: 320,
-                height: 320,
-                correctLevel: levelVal
-            });
-
+            if (isSending) return;
             isSending = true;
+
+            var btn = document.getElementById('btn-send');
+            var statusEl = document.getElementById('send-status');
+            var chunkSize = clampInt(document.getElementById('chunk-size').value, 50, 800, 250);
+            document.getElementById('chunk-size').value = chunkSize;
+            var fps = clampInt(document.getElementById('fps').value, 1, 30, 20);
+            document.getElementById('fps').value = fps;
+            var fountain = document.getElementById('fountain-mode').checked;
+
+            statusEl.textContent = '⏳ 正在压缩编码...';
             btn.textContent = '⏹ 停止闪烁';
             btn.classList.add('stop');
 
-            const fps = parseInt(document.getElementById('fps').value) || 15;
-            const frameDuration = 1000 / fps;
-
-            let currentFrameIndex = 0;
-            let direction = 1;
-
-            sendInterval = setInterval(() => {
-                let payload = `${currentFrameIndex}|${total}|${chunks[currentFrameIndex]}`;
-
-                qrEncoder.clear();
-                qrEncoder.makeCode(payload);
-
-                let dirText = direction === 1 ? "正向传送" : "反向回扫";
-                statusEl.textContent = `⚡ [${dirText}] 第 ${currentFrameIndex + 1} / ${total} 页`;
-
-                if (total > 1) {
-                    currentFrameIndex += direction;
-                    if (currentFrameIndex >= total) {
-                        direction = -1;
-                        currentFrameIndex = total - 2;
-                    } else if (currentFrameIndex < 0) {
-                        direction = 1;
-                        currentFrameIndex = 1;
-                    }
+            prepareData(text).then(function(result) {
+                if (!isSending) return;
+                var b64 = result.b64;
+                var baseFlag = result.flag;
+                var chunks = [];
+                for (var i = 0; i < b64.length; i += chunkSize) {
+                    chunks.push(b64.substring(i, Math.min(i + chunkSize, b64.length)));
                 }
-            }, frameDuration);
+                var total = chunks.length;
+                var size = b64.length;
+                var sid = makeSid(b64);
+                var crc = crc32(base64ToBytes(b64));
+                var flag = fountain ? baseFlag + 2 : baseFlag;
+                var sendChunks = fountain ? padChunks(chunks) : chunks;
+
+                document.getElementById('qrcode').innerHTML = '';
+                var levelVal = parseInt(document.getElementById('correct-level').value, 10);
+                qrEncoder = new QRCode(document.getElementById('qrcode'), {
+                    width: 320,
+                    height: 320,
+                    correctLevel: levelVal
+                });
+
+                var estSec = (total / fps).toFixed(1);
+                var gzText = baseFlag === 1 ? ' | 已gzip' : '';
+                var infoLine = '共 ' + total + ' 页' + gzText + '，约 ' + estSec + ' 秒一轮';
+                statusEl.textContent = infoLine;
+
+                var frameDuration = 1000 / fps;
+                var virtualFrame = 0;
+                var shownFrame = -1;
+                var lastTime = performance.now();
+                var direction = 1;
+
+                function frameIndexAt(v) {
+                    if (fountain) return v;
+                    if (total <= 1) return 0;
+                    var period = 2 * (total - 1);
+                    var m = v % period;
+                    return m < total ? m : period - m;
+                }
+
+                function renderFrame(v) {
+                    var payload;
+                    if (fountain) {
+                        var e = fountainEmit(sendChunks, total, v);
+                        payload = packFrame(sid, flag, e.seed, total, size, crc, e.data);
+                        statusEl.textContent = infoLine + ' | 播第 ' + (v + 1) + ' 帧';
+                    } else {
+                        var idx = frameIndexAt(v);
+                        payload = packFrame(sid, flag, idx, total, size, crc, chunks[idx]);
+                        var dirText = direction === 1 ? '正向' : '反向';
+                        statusEl.textContent = infoLine + ' | ' + dirText + ' 第 ' + (idx + 1) + ' / ' + total + ' 页';
+                        direction = (frameIndexAt(v + 1) >= idx) ? 1 : -1;
+                    }
+                    qrEncoder.clear();
+                    qrEncoder.makeCode(payload);
+                }
+
+                renderFrame(0);
+                shownFrame = 0;
+
+                function sendTick(now) {
+                    if (!isSending) return;
+                    var elapsed = now - lastTime;
+                    if (elapsed >= frameDuration) {
+                        virtualFrame += Math.floor(elapsed / frameDuration);
+                        lastTime += Math.floor(elapsed / frameDuration) * frameDuration;
+                        if (virtualFrame !== shownFrame) {
+                            shownFrame = virtualFrame;
+                            renderFrame(shownFrame);
+                        }
+                    }
+                    sendRafId = requestAnimationFrame(sendTick);
+                }
+                sendRafId = requestAnimationFrame(sendTick);
+            }).catch(function(err) {
+                statusEl.textContent = '❌ 编码失败: ' + (err.message || '未知错误');
+                stopSend();
+            });
         }
 
         function stopSend() {
             isSending = false;
-            if (sendInterval) clearInterval(sendInterval);
-            releaseAwake();
-            const btn = document.getElementById('btn-send');
-            btn.textContent = '⚡ 立即生成并循环闪烁';
+            if (sendRafId) { cancelAnimationFrame(sendRafId); sendRafId = null; }
+            var btn = document.getElementById('btn-send');
+            btn.textContent = '立即生成并循环闪烁';
             btn.classList.remove('stop');
-            document.getElementById('send-status').textContent = '已停止';
+            document.getElementById('send-status').textContent = '⏹ 已停止';
         }
 
-        let isReceiving = false;
-        let videoStream = null;
-        let receiveAnimationId = null;
-        let receivedMap = new Map();
-        let totalChunksCount = 0;
+        // ==================== 接收端 ====================
+        var SCAN_MAX_EDGE = 720;
+        var isReceiving = false;
+        var videoStream = null;
+        var receiveAnimationId = null;
+        var scanBusy = false;
+        var statusCounter = 0;
+        var session = null;
 
-        async function toggleReceive() {
+        function newSession(sid, flag, total, size, crc) {
+            return {
+                sid: sid, flag: flag, total: total, size: size, crc: crc,
+                fountain: flag >= 2,
+                decoder: flag >= 2 ? new FountainDecoder(total) : null,
+                received: {},
+                missingShownAt: 0
+            };
+        }
+
+        function toggleReceive() {
             if (isReceiving) stopReceive();
             else startReceive();
         }
 
-        async function startReceive() {
-            const video = document.getElementById('video');
-            const btn = document.getElementById('btn-receive');
+        function startReceive() {
+            var video = document.getElementById('video');
+            var btn = document.getElementById('btn-receive');
 
-            receivedMap.clear();
-            totalChunksCount = 0;
+            session = null;
             document.getElementById('receive-text').value = '';
             document.getElementById('btn-copy').style.display = 'none';
             document.getElementById('progress-fill').style.width = '0%';
-            keepAwake();
+            document.getElementById('receive-status').textContent = '等待二维码...';
 
-            try {
-                videoStream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: "environment" }
-                });
-                video.srcObject = videoStream;
-                video.setAttribute("playsinline", true);
+            navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment' }
+            }).then(function(stream) {
+                videoStream = stream;
+                video.srcObject = stream;
+                video.setAttribute('playsinline', true);
+                video.muted = true;
                 video.play();
 
                 isReceiving = true;
                 btn.textContent = '⏹ 停止扫描';
                 btn.classList.add('stop');
 
-                video.onplaying = () => { receiveAnimationId = requestAnimationFrame(scanTick); };
-            } catch (err) {
-                alert("开启相机失败，请检查权限。");
-            }
+                video.onplaying = function() { receiveAnimationId = requestAnimationFrame(scanTick); };
+            }).catch(function() {
+                alert('开启相机失败，请检查权限。');
+            });
         }
 
         function stopReceive() {
             isReceiving = false;
-            releaseAwake();
-            if (receiveAnimationId) cancelAnimationFrame(receiveAnimationId);
-            if (videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; }
+            if (receiveAnimationId) { cancelAnimationFrame(receiveAnimationId); receiveAnimationId = null; }
+            if (videoStream) { videoStream.getTracks().forEach(function(t) { t.stop(); }); videoStream = null; }
 
-            const btn = document.getElementById('btn-receive');
-            btn.textContent = '📸 开启极速扫描';
+            var btn = document.getElementById('btn-receive');
+            btn.textContent = '开启极速扫描';
             btn.classList.remove('stop');
         }
 
         function scanTick() {
             if (!isReceiving) return;
 
-            const video = document.getElementById('video');
-            const canvasElement = document.getElementById('canvas');
-            const ctx = canvasElement.getContext('2d', { willReadFrequently: true });
+            var video = document.getElementById('video');
+            var canvasElement = document.getElementById('canvas');
+            var ctx = canvasElement.getContext('2d', { willReadFrequently: true });
 
-            if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                canvasElement.width = video.videoWidth;
-                canvasElement.height = video.videoHeight;
-
+            if (!scanBusy && video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0) {
+                var vw = video.videoWidth, vh = video.videoHeight;
+                var scale = Math.min(1, SCAN_MAX_EDGE / Math.max(vw, vh));
+                canvasElement.width = Math.round(vw * scale);
+                canvasElement.height = Math.round(vh * scale);
                 ctx.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
+
+                var code = null;
                 try {
-                    const imageData = ctx.getImageData(0, 0, canvasElement.width, canvasElement.height);
-                    const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
-                    if (code && code.data) {
-                        processQRCodeFast(code.data);
-                    }
-                } catch (e) { }
+                    var imageData = ctx.getImageData(0, 0, canvasElement.width, canvasElement.height);
+                    code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
+                } catch(e) {}
+
+                if (code && code.data) {
+                    scanBusy = true;
+                    processFrameAsync(code.data).then(function() { scanBusy = false; }).catch(function() { scanBusy = false; });
+                }
             }
             receiveAnimationId = requestAnimationFrame(scanTick);
         }
 
-        function processQRCodeFast(rawData) {
-            const firstPipe = rawData.indexOf('|');
-            const secondPipe = rawData.indexOf('|', firstPipe + 1);
-            if (firstPipe === -1 || secondPipe === -1) return;
+        function processFrameAsync(rawData) {
+            return new Promise(function(resolve) {
+                var f = parseFrame(rawData);
+                if (!f) { resolve(); return; }
 
-            const index = parseInt(rawData.substring(0, firstPipe));
-            const total = parseInt(rawData.substring(firstPipe + 1, secondPipe));
-            const payload = rawData.substring(secondPipe + 1);
+                if (!session || session.sid !== f.sid) {
+                    session = newSession(f.sid, f.flag, f.total, f.size, f.crc);
+                    document.getElementById('progress-fill').style.width = '0%';
+                }
 
-            if (isNaN(index) || isNaN(total)) return;
-            if (totalChunksCount === 0) totalChunksCount = total;
+                var gotCount, total;
+                if (session.fountain) {
+                    session.decoder.addFrame(f.seed, f.payload);
+                    gotCount = session.decoder.solvedCount();
+                    total = session.total;
+                    updateProgress(gotCount, total, '🧪 喷泉接收: ' + gotCount + ' / ' + total);
+                    if (session.decoder.done) { finishTransfer(); }
+                } else {
+                    if (f.seed >= session.total) { resolve(); return; }
+                    if (!session.received[f.seed]) {
+                        session.received[f.seed] = f.payload;
+                        gotCount = Object.keys(session.received).length;
+                        total = session.total;
+                        updateProgress(gotCount, total, '⚡ 全速接收: ' + gotCount + ' / ' + total);
+                        if (gotCount === total) { finishTransfer(); }
+                    }
+                }
+                resolve();
+            });
+        }
 
-            if (!receivedMap.has(index)) {
-                receivedMap.set(index, payload);
+        function updateProgress(got, total, text) {
+            var percent = (got / total) * 100;
+            document.getElementById('progress-fill').style.width = percent + '%';
+            var statusEl = document.getElementById('receive-status');
+            statusEl.innerHTML = text;
 
-                const percent = (receivedMap.size / totalChunksCount) * 100;
-                document.getElementById('progress-fill').style.width = percent + '%';
-                document.getElementById('receive-status').textContent = `全速接收: ${receivedMap.size} / ${totalChunksCount}`;
-
-                if (receivedMap.size === totalChunksCount) {
-                    finishTransfer();
+            if (!session.fountain && total - got > 0 && total - got <= 10) {
+                statusCounter++;
+                if (statusCounter % 10 === 1) {
+                    var missing = [];
+                    for (var i = 0; i < total; i++) {
+                        if (!session.received[i]) missing.push(i + 1);
+                    }
+                    if (missing.length) {
+                        statusEl.innerHTML = text + '<br><span class="sub">等待分片: ' + missing.join(', ') + '</span>';
+                    }
                 }
             }
         }
 
         function finishTransfer() {
             stopReceive();
+            var statusEl = document.getElementById('receive-status');
             try {
-                let fullB64 = '';
-                for (let i = 0; i < totalChunksCount; i++) {
-                    fullB64 += receivedMap.get(i);
+                var fullB64 = '';
+                for (var i = 0; i < session.total; i++) {
+                    var piece = session.fountain ? session.decoder.solved[i] : session.received[i];
+                    if (piece == null) throw new Error('missing chunk ' + i);
+                    fullB64 += piece;
                 }
-                const originalText = base64ToUtf8(fullB64);
-
-                document.getElementById('receive-text').value = originalText;
-                document.getElementById('receive-status').textContent = '🎉 传输成功！文字已无损还原。';
-                document.getElementById('btn-copy').style.display = 'block';
-            } catch (e) {
-                document.getElementById('receive-status').textContent = '❌ 数据还原失败，请重试。';
+                if (session.fountain) fullB64 = fullB64.substring(0, session.size);
+                if (crc32(base64ToBytes(fullB64)) !== session.crc) {
+                    statusEl.textContent = '❌ 数据校验失败（CRC 不匹配），请重扫。';
+                    return;
+                }
+                restoreData(fullB64, session.flag & 1).then(function(originalText) {
+                    document.getElementById('receive-text').value = originalText;
+                    statusEl.textContent = '🎉 传输成功！文字已无损还原（CRC 校验通过）。';
+                    document.getElementById('btn-copy').style.display = 'block';
+                }).catch(function() {
+                    statusEl.textContent = '❌ 数据还原失败，请重试。';
+                });
+            } catch(e) {
+                statusEl.textContent = '❌ 数据还原失败，请重试。';
             }
         }
 
         function copyResult() {
-            const txt = document.getElementById('receive-text');
+            var txt = document.getElementById('receive-text');
             if (!txt.value) return;
             txt.select();
-            navigator.clipboard.writeText(txt.value).then(() => {
-                const btn = document.getElementById('btn-copy');
-                const originalText = btn.textContent;
+            navigator.clipboard.writeText(txt.value).then(function() {
+                var btn = document.getElementById('btn-copy');
+                var originalText = btn.textContent;
                 btn.textContent = '✅ 复制成功！';
                 btn.style.background = '#059669';
-                setTimeout(() => { btn.textContent = originalText; btn.style.background = '#10b981'; }, 1500);
-            }).catch(() => { alert("复制失败，请手动全选复制。"); });
+                setTimeout(function() { btn.textContent = originalText; btn.style.background = '#10b981'; }, 1500);
+            }).catch(function() { alert('复制失败，请手动全选复制。'); });
         }
     </script>
 </body>
-
-</html>
