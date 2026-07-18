@@ -6,145 +6,305 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light only">
     <title>🚀动态二维码传输</title>
-
-    <!-- ========== PWA 必须的标签 ========== -->
     <link rel="manifest" href="./manifest.json">
     <meta name="theme-color" content="#2563eb">
-    <!-- iOS Safari 支持 -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="二维码传输">
     <link rel="apple-touch-icon" href="./icons/icon-192.png">
-    <!-- ================================= -->
-
     <script src="./lib/qrcode.min.js"></script>
     <script src="./lib/jsQR.min.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f3f4f6; margin: 0; padding: 15px; color: #1f2937; }
-        .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-        h1 { font-size: 20px; text-align: center; margin-bottom: 20px; color: #111827; margin-top:0; }
-        .tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid #e5e7eb; }
-        .tab { flex: 1; text-align: center; padding: 12px; cursor: pointer; font-weight: bold; color: #6b7280; }
-        .tab.active { color: #2563eb; border-bottom: 2px solid #2563eb; margin-bottom: -2px; }
-        .panel { display: none; }
-        .panel.active { display: block; }
-        textarea { width: 100%; height: 160px; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; resize: vertical; font-size: 14px; }
-        button { background: #2563eb; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; font-size: 15px; transition: background 0.2s; }
-        button:hover { background: #1d4ed8; }
-        button.stop { background: #dc2626; }
-        button.stop:hover { background: #b91c1c; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f3f4f6;
+            margin: 0;
+            padding: 15px;
+            color: #1f2937
+        }
 
-        #qr-container { display: flex; justify-content: center; align-items: center; margin-top: 15px; min-height: 300px; background: #f9fafb; border-radius: 8px; border: 1px dashed #d1d5db; padding: 10px; }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1)
+        }
+
+        h1 {
+            font-size: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+            color: #111827;
+            margin-top: 0
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e5e7eb
+        }
+
+        .tab {
+            flex: 1;
+            text-align: center;
+            padding: 12px;
+            cursor: pointer;
+            font-weight: bold;
+            color: #6b7280
+        }
+
+        .tab.active {
+            color: #2563eb;
+            border-bottom: 2px solid #2563eb;
+            margin-bottom: -2px
+        }
+
+        .panel {
+            display: none
+        }
+
+        .panel.active {
+            display: block
+        }
+
+        textarea {
+            width: 100%;
+            height: 160px;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            box-sizing: border-box;
+            resize: vertical;
+            font-size: 14px
+        }
+
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+            margin-top: 10px;
+            font-size: 15px;
+            transition: background 0.2s
+        }
+
+        button:hover {
+            background: #1d4ed8
+        }
+
+        button.stop {
+            background: #dc2626
+        }
+
+        button.stop:hover {
+            background: #b91c1c
+        }
+
+        #qr-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 15px;
+            min-height: 300px;
+            background: #f9fafb;
+            border-radius: 8px;
+            border: 1px dashed #d1d5db;
+            padding: 10px
+        }
+
         #qrcode {
             background-color: #ffffff !important;
             padding: 16px !important;
             border-radius: 8px;
             display: inline-block;
             box-sizing: border-box;
-            color-scheme: light !important;
+            color-scheme: light !important
         }
-        #qrcode img, #qrcode canvas { background-color: #ffffff !important; }
 
-        #video-container { width: 100%; overflow: hidden; background: black; border-radius: 8px; margin-top: 15px; position: relative; }
-        video { width: 100%; height: auto; display: block; }
-        .progress-bar { height: 8px; background: #e5e7eb; border-radius: 4px; margin-top: 15px; overflow: hidden; }
-        .progress-fill { height: 100%; background: #10b981; width: 0%; transition: width 0.1s; }
-        .status { text-align: center; margin-top: 8px; font-size: 14px; font-weight: bold; color: #4b5563; }
-        .status .sub { font-weight: normal; color: #6b7280; font-size: 12px; }
-        .ctrl-group { margin: 10px 0; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
-        .ctrl-group input, .ctrl-group select { width: 130px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; text-align: center; font-size: 13px; }
-        .ctrl-group label input[type="checkbox"] { width: auto; margin-left: 6px; vertical-align: middle; }
+        #qrcode img,
+        #qrcode canvas {
+            background-color: #ffffff !important
+        }
+
+        #video-container {
+            width: 100%;
+            overflow: hidden;
+            background: black;
+            border-radius: 8px;
+            margin-top: 15px;
+            position: relative
+        }
+
+        video {
+            width: 100%;
+            height: auto;
+            display: block
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            margin-top: 15px;
+            overflow: hidden
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #10b981;
+            width: 0%;
+            transition: width 0.1s
+        }
+
+        .status {
+            text-align: center;
+            margin-top: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #4b5563
+        }
+
+        .status .sub {
+            font-weight: normal;
+            color: #6b7280;
+            font-size: 12px
+        }
+
+        .ctrl-group {
+            margin: 10px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px
+        }
+
+        .ctrl-group input,
+        .ctrl-group select {
+            width: 130px;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 13px
+        }
+
+        .ctrl-group label input[type="checkbox"] {
+            width: auto;
+            margin-left: 6px;
+            vertical-align: middle
+        }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h1>🚀 动态二维码传输 (极速版)</h1>
         <div class="tabs">
             <div class="tab" onclick="switchTab('send')">电脑发送端</div>
             <div class="tab active" onclick="switchTab('receive')">手机接收端</div>
+            <div class="tab" onclick="switchTab('base64')">Base64编解码</div>
         </div>
-
         <div id="panel-send" class="panel">
             <textarea id="send-text" placeholder="请在此处粘贴需要传输的长文本..."></textarea>
-            <div class="ctrl-group">
-                <label>二维码容错率:</label>
-                <select id="correct-level">
+            <div class="ctrl-group"><label>二维码容错率:</label><select id="correct-level">
                     <option value="1" selected>L级 (7% 极速，适合无遮挡)</option>
                     <option value="0">M级 (15% 均衡推荐)</option>
                     <option value="3">Q级 (25% 较高可靠)</option>
                     <option value="2">H级 (30% 极强，点阵最密)</option>
-                </select>
+                </select></div>
+            <div class="ctrl-group"><label>单页字符 (推荐 250-300):</label><input type="number" id="chunk-size" value="250"
+                    min="50" max="800"></div>
+            <div class="ctrl-group"><label>闪烁速度 (FPS):</label><input type="number" id="fps" value="20" min="1" max="30">
             </div>
-            <div class="ctrl-group">
-                <label>单页字符 (推荐 250-300):</label>
-                <input type="number" id="chunk-size" value="250" min="50" max="800">
-            </div>
-            <div class="ctrl-group">
-                <label>闪烁速度 (FPS):</label>
-                <input type="number" id="fps" value="20" min="1" max="30">
-            </div>
-            <div class="ctrl-group">
-                <label>🧪 喷泉码模式 (丢帧自动补齐):</label>
-                <input type="checkbox" id="fountain-mode">
-            </div>
+            <div class="ctrl-group"><label>🧪 喷泉码模式 (丢帧自动补齐):</label><input type="checkbox" id="fountain-mode"></div>
             <button id="btn-send" onclick="toggleSend()">⚡ 立即生成并循环闪烁</button>
             <div id="qr-container">
                 <div id="qrcode"></div>
             </div>
             <div id="send-status" class="status">未开始</div>
         </div>
-
         <div id="panel-receive" class="panel active">
             <button id="btn-receive" onclick="toggleReceive()">📸 开启极速扫描</button>
-            <div id="video-container">
-                <video id="video" playsinline muted></video>
-                <canvas id="canvas" style="display:none;"></canvas>
-            </div>
+            <div id="video-container"><video id="video" playsinline muted></video><canvas id="canvas"
+                    style="display:none;"></canvas></div>
             <div class="progress-bar">
                 <div id="progress-fill" class="progress-fill"></div>
             </div>
             <div id="receive-status" class="status">等待开始...</div>
             <textarea id="receive-text" placeholder="接收完成后，完整文本会直接显示在这里..." readonly
-                style="margin-top:15px; background:#f9fafb; height: 180px;"></textarea>
-            <button id="btn-copy" onclick="copyResult()" style="background:#10b981; display:none;">📋 一键复制完整文本</button>
+                style="margin-top:15px;background:#f9fafb;height:180px;"></textarea>
+            <button id="btn-copy" onclick="copyResult()" style="background:#10b981;display:none;">📋 一键复制完整文本</button>
+        </div>
+        <div id="panel-base64" class="panel">
+            <textarea id="b64-input" placeholder="请输入需要 Base64 编码/解码的文本" style="height:120px;"></textarea>
+            <div class="ctrl-group">
+                <label>字符编码:</label>
+                <select id="b64-charset" style="width:130px;">
+                    <option value="utf-8" selected>UTF-8</option>
+                    <option value="utf-16le">UTF-16LE</option>
+                    <option value="utf-16be">UTF-16BE</option>
+                    <option value="gbk">GBK</option>
+                </select>
+            </div>
+            <div class="ctrl-group">
+                <button id="btn-b64-encode" onclick="b64Encode()"
+                    style="width:auto;padding:8px 16px;font-size:13px;background:#059669;">Base64 编码</button>
+                <button id="btn-b64-decode" onclick="b64Decode()"
+                    style="width:auto;padding:8px 16px;font-size:13px;background:#7c3aed;margin-left:6px;">Base64
+                    解码</button>
+                <button onclick="b64Swap()"
+                    style="width:auto;padding:8px 16px;font-size:13px;background:#6b7280;margin-left:6px;">⇄ 交换</button>
+                <button onclick="b64Clear()"
+                    style="width:auto;padding:8px 16px;font-size:13px;background:#dc2626;margin-left:6px;">清空</button>
+            </div>
+            <textarea id="b64-output" placeholder="处理结果" readonly
+                style="height:120px;background:#f9fafb;margin-top:10px;"></textarea>
+            <button onclick="b64Copy()" style="background:#10b981;margin-top:10px;display:none;" id="btn-b64-copy">📋
+                复制结果</button>
         </div>
     </div>
-
     <script>
         // ==================== 注册 Service Worker（PWA 核心） ====================
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
+            window.addEventListener('load', function () {
                 navigator.serviceWorker.register('./sw.js')
-                    .then(registration => {
-                        console.log('Service Worker 注册成功');
-                    })
-                    .catch(err => {
-                        console.log('Service Worker 注册失败: ', err);
-                    });
+                    .then(function (r) { console.log('SW ok'); })
+                    .catch(function (e) { console.log('SW fail', e); });
             });
         }
-        // ====================================================================
 
-        // ==================== 核心逻辑 ====================
+        // ==================== 工具函数 ====================
 
-        // ---------- 工具：UTF-8 / Base64 ----------
+        // UTF-8 文本 → Base64
         function utf8ToBase64(str) {
             var bytes = new TextEncoder().encode(str);
             var bin = '';
             for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
             return btoa(bin);
         }
+
+        // Base64 → UTF-8 文本
         function base64ToUtf8(b64) {
             var bin = atob(b64);
             var bytes = new Uint8Array(bin.length);
             for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
             return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
         }
-        function bytesToBase64(bytes) {
+
+        // Uint8Array → Base64
+        function bytesToBase64(buf) {
             var bin = '';
-            for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+            for (var i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
             return btoa(bin);
         }
+
+        // Base64 → Uint8Array
         function base64ToBytes(b64) {
             var bin = atob(b64);
             var bytes = new Uint8Array(bin.length);
@@ -152,25 +312,43 @@
             return bytes;
         }
 
-        // ---------- 工具：gzip 压缩 ----------
-        var COMPRESSION_SUPPORTED = typeof CompressionStream === 'function' && typeof DecompressionStream === 'function';
-        function gzipCompress(bytes) {
-            return new Promise(function(resolve) {
-                var cs = new CompressionStream('gzip');
-                var r = new Response(new Blob([bytes]).stream().pipeThrough(cs));
-                r.arrayBuffer().then(function(buf) { resolve(new Uint8Array(buf)); });
-            });
+        // charCode 0-255 的 JS 字符串 → Uint8Array
+        function strToBytes(s) {
+            var bytes = new Uint8Array(s.length);
+            for (var i = 0; i < s.length; i++) bytes[i] = s.charCodeAt(i) & 0xFF;
+            return bytes;
         }
-        function gzipDecompress(bytes) {
-            return new Promise(function(resolve) {
-                var ds = new DecompressionStream('gzip');
-                var r = new Response(new Blob([bytes]).stream().pipeThrough(ds));
-                r.arrayBuffer().then(function(buf) { resolve(new Uint8Array(buf)); });
+
+        // Uint8Array → charCode 0-255 的 JS 字符串
+        function bytesToStr(a) {
+            var s = '';
+            for (var i = 0; i < a.length; i++) s += String.fromCharCode(a[i]);
+            return s;
+        }
+
+        // ==================== gzip 压缩 ====================
+
+        var COMPRESSION_SUPPORTED = typeof CompressionStream === 'function' && typeof DecompressionStream === 'function';
+
+        function gzCompress(bytes) {
+            return new Promise(function (ok) {
+                var cs = new CompressionStream('gzip');
+                new Response(new Blob([bytes]).stream().pipeThrough(cs))
+                    .arrayBuffer().then(function (buf) { ok(new Uint8Array(buf)); });
             });
         }
 
-        // ---------- CRC32 ----------
-        var CRC_TABLE = (function() {
+        function gzDecompress(bytes) {
+            return new Promise(function (ok) {
+                var ds = new DecompressionStream('gzip');
+                new Response(new Blob([bytes]).stream().pipeThrough(ds))
+                    .arrayBuffer().then(function (buf) { ok(new Uint8Array(buf)); });
+            });
+        }
+
+        // ==================== CRC32 ====================
+
+        var CRC_TABLE = (function () {
             var t = new Uint32Array(256);
             for (var n = 0; n < 256; n++) {
                 var c = n;
@@ -179,41 +357,47 @@
             }
             return t;
         })();
+
         function crc32(bytes) {
             var c = 0xFFFFFFFF;
             for (var i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
             return (c ^ 0xFFFFFFFF) >>> 0;
         }
 
-        // ---------- 数据准备 ----------
+        // ==================== 数据准备 ====================
+
+        // 文本 → (可选 gzip) → base64 字符串
         function prepareData(text) {
-            return new Promise(function(resolve) {
+            return new Promise(function (ok) {
                 if (COMPRESSION_SUPPORTED) {
                     var raw = new TextEncoder().encode(text);
-                    gzipCompress(raw).then(function(compressed) {
-                        if (compressed.length < raw.length) {
-                            resolve({ b64: bytesToBase64(compressed), flag: 1 });
+                    gzCompress(raw).then(function (z) {
+                        if (z.length < raw.length) {
+                            ok({ b64: bytesToBase64(z), flag: 1 });
                         } else {
-                            resolve({ b64: utf8ToBase64(text), flag: 0 });
+                            ok({ b64: utf8ToBase64(text), flag: 0 });
                         }
-                    }).catch(function() {
-                        resolve({ b64: utf8ToBase64(text), flag: 0 });
+                    }).catch(function () {
+                        ok({ b64: utf8ToBase64(text), flag: 0 });
                     });
                 } else {
-                    resolve({ b64: utf8ToBase64(text), flag: 0 });
+                    ok({ b64: utf8ToBase64(text), flag: 0 });
                 }
             });
         }
+
+        // base64 字符串 → (可选 gunzip) → 原始文本
         function restoreData(b64, flag) {
             if (flag === 1) {
-                return gzipDecompress(base64ToBytes(b64)).then(function(dec) {
-                    return new TextDecoder('utf-8', { fatal: true }).decode(dec);
+                return gzDecompress(base64ToBytes(b64)).then(function (d) {
+                    return new TextDecoder('utf-8', { fatal: true }).decode(d);
                 });
             }
             return Promise.resolve(base64ToUtf8(b64));
         }
 
-        // ---------- 会话 ID ----------
+        // ==================== 会话 ID ====================
+
         function makeSid(b64) {
             var h = 0x811c9dc5;
             for (var i = 0; i < b64.length; i++) {
@@ -223,10 +407,11 @@
             return (h >>> 0).toString(36);
         }
 
-        // ---------- PRNG ----------
+        // ==================== PRNG（mulberry32） ====================
+
         function mulberry32(seed) {
             var a = seed >>> 0;
-            return function() {
+            return function () {
                 a |= 0; a = (a + 0x6D2B79F5) | 0;
                 var t = Math.imul(a ^ (a >>> 15), 1 | a);
                 t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
@@ -234,7 +419,9 @@
             };
         }
 
-        // ---------- LT 喷泉码 ----------
+        // ==================== LT 喷泉码 ====================
+
+        // Robust Soliton 分布简化版：理想孤波 + 对低度数的温和偏置
         function sampleDegree(rng, K) {
             var u = rng();
             var d = Math.floor(1 / u);
@@ -242,22 +429,28 @@
             if (d > 1 && rng() < 0.1) d = 2 + Math.floor(rng() * Math.min(K - 1, 9));
             return Math.max(1, Math.min(K, d));
         }
+
+        // 由种子确定性选出不重复的源分片下标
         function pickIndices(seed, K) {
             var rng = mulberry32(seed);
             var degree = sampleDegree(rng, K);
-            var idxSet = {};
-            var cnt = 0;
-            while (cnt < degree) {
+            var seen = {};
+            var count = 0;
+            while (count < degree) {
                 var idx = Math.floor(rng() * K);
-                if (!idxSet[idx]) { idxSet[idx] = true; cnt++; }
+                if (!seen[idx]) { seen[idx] = true; count++; }
             }
-            return Object.keys(idxSet).map(Number);
+            return Object.keys(seen).map(Number);
         }
+
+        // 右补 NUL 到等长（XOR 恒等元，解码后自动抵消）
         function padChunks(chunks) {
             var maxLen = 0;
-            for (var i = 0; i < chunks.length; i++) { if (chunks[i].length > maxLen) maxLen = chunks[i].length; }
-            return chunks.map(function(c) { return c.length < maxLen ? c + ' '.repeat(maxLen - c.length) : c; });
+            for (var i = 0; i < chunks.length; i++) if (chunks[i].length > maxLen) maxLen = chunks[i].length;
+            return chunks.map(function (c) { return c.length < maxLen ? c + '\x00'.repeat(maxLen - c.length) : c; });
         }
+
+        // 生成第 seq 帧（seq < K 时为系统帧 = 原始分片）
         function fountainEmit(paddedChunks, K, seq) {
             var idxs = seq < K ? [seq] : pickIndices(seq, K);
             var data = paddedChunks[idxs[0]];
@@ -266,41 +459,45 @@
             }
             return { seed: seq, data: data };
         }
+
+        // 剥皮解码器
         function FountainDecoder(K) {
             this.K = K;
             this.solved = new Array(K).fill(null);
             this.pending = [];
             this.done = false;
         }
-        FountainDecoder.prototype.solvedCount = function() {
+
+        FountainDecoder.prototype.solvedCount = function () {
             var n = 0;
             for (var i = 0; i < this.K; i++) if (this.solved[i] !== null) n++;
             return n;
         };
-        FountainDecoder.prototype.addFrame = function(seed, data) {
+
+        FountainDecoder.prototype.addFrame = function (seed, data) {
             if (this.done) return;
             var idxs = seed < this.K ? [seed] : pickIndices(seed, this.K);
             var idxSet = {};
             for (var i = 0; i < idxs.length; i++) idxSet[idxs[i]] = true;
-            var solved = this.solved;
-            var rmKeys = [];
+            // 用已解出的分片先化简
+            var toRemove = [];
             for (var k in idxSet) {
                 var ki = Number(k);
-                if (solved[ki] !== null) {
-                    data = xorStr(data, solved[ki]);
-                    rmKeys.push(ki);
+                if (this.solved[ki] !== null) {
+                    data = xorStr(data, this.solved[ki]);
+                    toRemove.push(ki);
                 }
             }
-            for (var i = 0; i < rmKeys.length; i++) delete idxSet[rmKeys[i]];
-            var keys = Object.keys(idxSet);
-            if (keys.length === 0) return;
+            for (var i = 0; i < toRemove.length; i++) delete idxSet[toRemove[i]];
+            if (Object.keys(idxSet).length === 0) return; // 冗余帧
             this.pending.push({ idxSet: idxSet, data: data });
             this.peel();
             if (this.solvedCount() === this.K) { this.done = true; this.pending = []; }
         };
-        FountainDecoder.prototype.peel = function() {
-            var progressed = true;
+
+        FountainDecoder.prototype.peel = function () {
             var self = this;
+            var progressed = true;
             while (progressed) {
                 progressed = false;
                 for (var i = self.pending.length - 1; i >= 0; i--) {
@@ -311,6 +508,7 @@
                         self.pending.splice(i, 1);
                         if (self.solved[idx] === null) {
                             self.solved[idx] = data;
+                            // 用新解出的分片去化简剩余 pending
                             for (var j = 0; j < self.pending.length; j++) {
                                 if (self.pending[j].idxSet[idx]) {
                                     self.pending[j].data = xorStr(self.pending[j].data, data);
@@ -323,21 +521,24 @@
                 }
             }
         };
+
+        // 等长字符串逐字符 XOR
         function xorStr(a, b) {
             var out = '';
             for (var j = 0; j < a.length; j++) out += String.fromCharCode(a.charCodeAt(j) ^ b.charCodeAt(j));
             return out;
         }
 
-        // ---------- 帧格式 ----------
+        // ==================== 帧格式 ====================
+
         function packFrame(sid, flag, seed, total, size, crc, payload) {
             return sid + '|' + flag + '|' + seed + '|' + total + '|' + size + '|' + crc + '|' + payload;
         }
+
         function parseFrame(raw) {
             if (!raw || typeof raw !== 'string') return null;
             if (raw.length > 4000) return null;
-            var count = 0;
-            var pos = [];
+            var count = 0, pos = [];
             for (var i = 0; i < raw.length && count < 6; i++) {
                 if (raw.charCodeAt(i) === 124) { pos.push(i); count++; }
             }
@@ -358,29 +559,37 @@
             return { sid: sid, flag: flag, seed: seed, total: total, size: size, crc: crc, payload: payload };
         }
 
-        // ==================== 核心逻辑结束 ====================
+        // ==================== Tab 切换 ====================
 
         function switchTab(type) {
-            document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
-            document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('active'); });
+            var tabs = document.querySelectorAll('.tab');
+            var panels = document.querySelectorAll('.panel');
+            for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+            for (var i = 0; i < panels.length; i++) panels[i].classList.remove('active');
             if (type === 'send') {
-                document.querySelectorAll('.tab')[0].classList.add('active');
+                tabs[0].classList.add('active');
                 document.getElementById('panel-send').classList.add('active');
                 stopReceive();
-            } else {
-                document.querySelectorAll('.tab')[1].classList.add('active');
+            } else if (type === 'receive') {
+                tabs[1].classList.add('active');
                 document.getElementById('panel-receive').classList.add('active');
                 stopSend();
+            } else {
+                tabs[2].classList.add('active');
+                document.getElementById('panel-base64').classList.add('active');
+                stopSend();
+                stopReceive();
             }
         }
 
-        function clampInt(value, min, max, fallback) {
+        function clamp(value, min, max, fallback) {
             var n = parseInt(value, 10);
             if (isNaN(n)) return fallback;
             return Math.min(max, Math.max(min, n));
         }
 
         // ==================== 发送端 ====================
+
         var isSending = false;
         var sendRafId = null;
         var qrEncoder = null;
@@ -393,15 +602,14 @@
         function startSend() {
             var text = document.getElementById('send-text').value.trim();
             if (!text) { alert('请先粘贴文本！'); return; }
-
             if (isSending) return;
             isSending = true;
 
             var btn = document.getElementById('btn-send');
             var statusEl = document.getElementById('send-status');
-            var chunkSize = clampInt(document.getElementById('chunk-size').value, 50, 800, 250);
+            var chunkSize = clamp(document.getElementById('chunk-size').value, 50, 800, 250);
             document.getElementById('chunk-size').value = chunkSize;
-            var fps = clampInt(document.getElementById('fps').value, 1, 30, 20);
+            var fps = clamp(document.getElementById('fps').value, 1, 30, 20);
             document.getElementById('fps').value = fps;
             var fountain = document.getElementById('fountain-mode').checked;
 
@@ -409,10 +617,12 @@
             btn.textContent = '⏹ 停止闪烁';
             btn.classList.add('stop');
 
-            prepareData(text).then(function(result) {
+            prepareData(text).then(function (result) {
                 if (!isSending) return;
                 var b64 = result.b64;
                 var baseFlag = result.flag;
+
+                // 分片
                 var chunks = [];
                 for (var i = 0; i < b64.length; i += chunkSize) {
                     chunks.push(b64.substring(i, Math.min(i + chunkSize, b64.length)));
@@ -437,6 +647,7 @@
                 var infoLine = '共 ' + total + ' 页' + gzText + '，约 ' + estSec + ' 秒一轮';
                 statusEl.textContent = infoLine;
 
+                // rAF + 时间戳调度
                 var frameDuration = 1000 / fps;
                 var virtualFrame = 0;
                 var shownFrame = -1;
@@ -485,7 +696,7 @@
                     sendRafId = requestAnimationFrame(sendTick);
                 }
                 sendRafId = requestAnimationFrame(sendTick);
-            }).catch(function(err) {
+            }).catch(function (err) {
                 statusEl.textContent = '❌ 编码失败: ' + (err.message || '未知错误');
                 stopSend();
             });
@@ -495,12 +706,13 @@
             isSending = false;
             if (sendRafId) { cancelAnimationFrame(sendRafId); sendRafId = null; }
             var btn = document.getElementById('btn-send');
-            btn.textContent = '立即生成并循环闪烁';
+            btn.textContent = '⚡ 立即生成并循环闪烁';
             btn.classList.remove('stop');
             document.getElementById('send-status').textContent = '⏹ 已停止';
         }
 
         // ==================== 接收端 ====================
+
         var SCAN_MAX_EDGE = 720;
         var isReceiving = false;
         var videoStream = null;
@@ -515,7 +727,8 @@
                 fountain: flag >= 2,
                 decoder: flag >= 2 ? new FountainDecoder(total) : null,
                 received: {},
-                missingShownAt: 0
+                nextSid: null,
+                nextSidCount: 0
             };
         }
 
@@ -534,69 +747,68 @@
             document.getElementById('progress-fill').style.width = '0%';
             document.getElementById('receive-status').textContent = '等待二维码...';
 
-            navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'environment' }
-            }).then(function(stream) {
-                videoStream = stream;
-                video.srcObject = stream;
-                video.setAttribute('playsinline', true);
-                video.muted = true;
-                video.play();
-
-                isReceiving = true;
-                btn.textContent = '⏹ 停止扫描';
-                btn.classList.add('stop');
-
-                video.onplaying = function() { receiveAnimationId = requestAnimationFrame(scanTick); };
-            }).catch(function() {
-                alert('开启相机失败，请检查权限。');
-            });
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+                .then(function (stream) {
+                    videoStream = stream;
+                    video.srcObject = stream;
+                    video.setAttribute('playsinline', true);
+                    video.muted = true;
+                    video.play();
+                    isReceiving = true;
+                    btn.textContent = '⏹ 停止扫描';
+                    btn.classList.add('stop');
+                    video.onplaying = function () { receiveAnimationId = requestAnimationFrame(scanTick); };
+                })
+                .catch(function () { alert('开启相机失败，请检查权限。'); });
         }
 
         function stopReceive() {
             isReceiving = false;
             if (receiveAnimationId) { cancelAnimationFrame(receiveAnimationId); receiveAnimationId = null; }
-            if (videoStream) { videoStream.getTracks().forEach(function(t) { t.stop(); }); videoStream = null; }
-
+            if (videoStream) { videoStream.getTracks().forEach(function (t) { t.stop(); }); videoStream = null; }
             var btn = document.getElementById('btn-receive');
-            btn.textContent = '开启极速扫描';
+            btn.textContent = '📸 开启极速扫描';
             btn.classList.remove('stop');
         }
 
         function scanTick() {
             if (!isReceiving) return;
-
             var video = document.getElementById('video');
-            var canvasElement = document.getElementById('canvas');
-            var ctx = canvasElement.getContext('2d', { willReadFrequently: true });
+            var canvas = document.getElementById('canvas');
+            var ctx = canvas.getContext('2d', { willReadFrequently: true });
 
             if (!scanBusy && video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0) {
                 var vw = video.videoWidth, vh = video.videoHeight;
                 var scale = Math.min(1, SCAN_MAX_EDGE / Math.max(vw, vh));
-                canvasElement.width = Math.round(vw * scale);
-                canvasElement.height = Math.round(vh * scale);
-                ctx.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
-
+                canvas.width = Math.round(vw * scale);
+                canvas.height = Math.round(vh * scale);
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 var code = null;
                 try {
-                    var imageData = ctx.getImageData(0, 0, canvasElement.width, canvasElement.height);
+                    var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                     code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
-                } catch(e) {}
-
+                } catch (e) { }
                 if (code && code.data) {
                     scanBusy = true;
-                    processFrameAsync(code.data).then(function() { scanBusy = false; }).catch(function() { scanBusy = false; });
+                    procFrame(code.data).then(function () { scanBusy = false; }).catch(function () { scanBusy = false; });
                 }
             }
             receiveAnimationId = requestAnimationFrame(scanTick);
         }
 
-        function processFrameAsync(rawData) {
-            return new Promise(function(resolve) {
+        function procFrame(rawData) {
+            return new Promise(function (resolve) {
                 var f = parseFrame(rawData);
                 if (!f) { resolve(); return; }
 
-                if (!session || session.sid !== f.sid) {
+                // sid 去抖：连续 2 帧新 sid 才确认切换
+                if (session && f.sid !== session.sid) {
+                    if (!session.nextSid) { session.nextSid = f.sid; session.nextSidCount = 1; resolve(); return; }
+                    if (session.nextSid !== f.sid) { session.nextSid = f.sid; session.nextSidCount = 1; resolve(); return; }
+                    session.nextSidCount++;
+                    if (session.nextSidCount < 2) { resolve(); return; }
+                }
+                if (!session || (session.nextSid && session.nextSidCount >= 2 && session.nextSid === f.sid)) {
                     session = newSession(f.sid, f.flag, f.total, f.size, f.crc);
                     document.getElementById('progress-fill').style.width = '0%';
                 }
@@ -607,7 +819,7 @@
                     gotCount = session.decoder.solvedCount();
                     total = session.total;
                     updateProgress(gotCount, total, '🧪 喷泉接收: ' + gotCount + ' / ' + total);
-                    if (session.decoder.done) { finishTransfer(); }
+                    if (session.decoder.done) finishTransfer();
                 } else {
                     if (f.seed >= session.total) { resolve(); return; }
                     if (!session.received[f.seed]) {
@@ -615,7 +827,7 @@
                         gotCount = Object.keys(session.received).length;
                         total = session.total;
                         updateProgress(gotCount, total, '⚡ 全速接收: ' + gotCount + ' / ' + total);
-                        if (gotCount === total) { finishTransfer(); }
+                        if (gotCount === total) finishTransfer();
                     }
                 }
                 resolve();
@@ -623,18 +835,16 @@
         }
 
         function updateProgress(got, total, text) {
-            var percent = (got / total) * 100;
-            document.getElementById('progress-fill').style.width = percent + '%';
+            var pct = (got / total) * 100;
+            document.getElementById('progress-fill').style.width = pct + '%';
             var statusEl = document.getElementById('receive-status');
             statusEl.innerHTML = text;
-
+            // 接近完成时提示缺失分片
             if (!session.fountain && total - got > 0 && total - got <= 10) {
                 statusCounter++;
                 if (statusCounter % 10 === 1) {
                     var missing = [];
-                    for (var i = 0; i < total; i++) {
-                        if (!session.received[i]) missing.push(i + 1);
-                    }
+                    for (var i = 0; i < total; i++) if (!session.received[i]) missing.push(i + 1);
                     if (missing.length) {
                         statusEl.innerHTML = text + '<br><span class="sub">等待分片: ' + missing.join(', ') + '</span>';
                     }
@@ -652,19 +862,21 @@
                     if (piece == null) throw new Error('missing chunk ' + i);
                     fullB64 += piece;
                 }
+                // 喷泉模式分片右补过 NUL，按原始长度截断
                 if (session.fountain) fullB64 = fullB64.substring(0, session.size);
+                // CRC32 全文校验
                 if (crc32(base64ToBytes(fullB64)) !== session.crc) {
                     statusEl.textContent = '❌ 数据校验失败（CRC 不匹配），请重扫。';
                     return;
                 }
-                restoreData(fullB64, session.flag & 1).then(function(originalText) {
+                restoreData(fullB64, session.flag & 1).then(function (originalText) {
                     document.getElementById('receive-text').value = originalText;
                     statusEl.textContent = '🎉 传输成功！文字已无损还原（CRC 校验通过）。';
                     document.getElementById('btn-copy').style.display = 'block';
-                }).catch(function() {
+                }).catch(function () {
                     statusEl.textContent = '❌ 数据还原失败，请重试。';
                 });
-            } catch(e) {
+            } catch (e) {
                 statusEl.textContent = '❌ 数据还原失败，请重试。';
             }
         }
@@ -673,13 +885,118 @@
             var txt = document.getElementById('receive-text');
             if (!txt.value) return;
             txt.select();
-            navigator.clipboard.writeText(txt.value).then(function() {
+            navigator.clipboard.writeText(txt.value).then(function () {
                 var btn = document.getElementById('btn-copy');
                 var originalText = btn.textContent;
                 btn.textContent = '✅ 复制成功！';
                 btn.style.background = '#059669';
-                setTimeout(function() { btn.textContent = originalText; btn.style.background = '#10b981'; }, 1500);
-            }).catch(function() { alert('复制失败，请手动全选复制。'); });
+                setTimeout(function () { btn.textContent = originalText; btn.style.background = '#10b981'; }, 1500);
+            }).catch(function () { alert('复制失败，请手动全选复制。'); });
+        }
+
+        // ==================== Base64 编解码工具 ====================
+
+        function b64Encode() {
+            var inp = document.getElementById('b64-input');
+            var out = document.getElementById('b64-output');
+            var charset = document.getElementById('b64-charset').value;
+            if (!inp.value.trim()) { alert('请输入文本！'); return; }
+            try {
+                var bytes;
+                if (charset === 'utf-16le' || charset === 'utf-16be') {
+                    bytes = strToUTF16(inp.value, charset === 'utf-16le');
+                } else if (charset === 'gbk') {
+                    bytes = strToGBK(inp.value);
+                } else {
+                    bytes = new TextEncoder().encode(inp.value);
+                }
+                out.value = bytesToBase64(bytes);
+                document.getElementById('btn-b64-copy').style.display = 'block';
+            } catch (e) {
+                out.value = '编码失败: ' + e.message;
+            }
+        }
+
+        function b64Decode() {
+            var inp = document.getElementById('b64-input');
+            var out = document.getElementById('b64-output');
+            var charset = document.getElementById('b64-charset').value;
+            if (!inp.value.trim()) { alert('请输入 Base64 字符串！'); return; }
+            try {
+                var bytes = base64ToBytes(inp.value.trim());
+                var text;
+                if (charset === 'utf-16le' || charset === 'utf-16be') {
+                    text = utf16ToStr(bytes, charset === 'utf-16le');
+                } else if (charset === 'gbk') {
+                    text = gbkToStr(bytes);
+                } else {
+                    text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+                }
+                out.value = text;
+                document.getElementById('btn-b64-copy').style.display = 'block';
+            } catch (e) {
+                out.value = '解码失败: ' + e.message;
+            }
+        }
+
+        function strToUTF16(str, littleEndian) {
+            var len = str.length;
+            var buf = new Uint8Array(len * 2);
+            for (var i = 0; i < len; i++) {
+                var c = str.charCodeAt(i);
+                if (littleEndian) {
+                    buf[i * 2] = c & 0xFF;
+                    buf[i * 2 + 1] = c >>> 8;
+                } else {
+                    buf[i * 2] = c >>> 8;
+                    buf[i * 2 + 1] = c & 0xFF;
+                }
+            }
+            return buf;
+        }
+
+        function utf16ToStr(bytes, littleEndian) {
+            var s = '';
+            for (var i = 0; i + 1 < bytes.length; i += 2) {
+                var c;
+                if (littleEndian) {
+                    c = bytes[i] | (bytes[i + 1] << 8);
+                } else {
+                    c = (bytes[i] << 8) | bytes[i + 1];
+                }
+                s += String.fromCharCode(c);
+            }
+            return s;
+        }
+
+        function strToGBK(str) { return new TextEncoder().encode(str); }
+        function gbkToStr(bytes) { return new TextDecoder('utf-8', { fatal: false }).decode(bytes); }
+
+        function b64Swap() {
+            var inp = document.getElementById('b64-input');
+            var out = document.getElementById('b64-output');
+            var temp = inp.value;
+            inp.value = out.value;
+            out.value = temp;
+        }
+
+        function b64Clear() {
+            document.getElementById('b64-input').value = '';
+            document.getElementById('b64-output').value = '';
+            document.getElementById('btn-b64-copy').style.display = 'none';
+        }
+
+        function b64Copy() {
+            var out = document.getElementById('b64-output');
+            if (!out.value) return;
+            navigator.clipboard.writeText(out.value).then(function () {
+                var btn = document.getElementById('btn-b64-copy');
+                var orig = btn.textContent;
+                btn.textContent = '✅ 已复制';
+                setTimeout(function () { btn.textContent = orig; }, 1500);
+            }).catch(function () { alert('复制失败'); });
         }
     </script>
 </body>
+
+</html>
