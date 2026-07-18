@@ -645,7 +645,16 @@
                 var estSec = (total / fps).toFixed(1);
                 var gzText = baseFlag === 1 ? ' | 已gzip' : '';
                 var infoLine = '共 ' + total + ' 页' + gzText + '，约 ' + estSec + ' 秒一轮';
-                statusEl.textContent = infoLine;
+                // 原文统计行
+                var rawBytes = new TextEncoder().encode(text).length;
+                var sizeText = rawBytes < 1024 ? rawBytes + ' B' : (rawBytes / 1024).toFixed(1) + ' KB';
+                var statLine = text.length + ' 字符，' + sizeText;
+                if (baseFlag === 1) {
+                    var gzBytes = base64ToBytes(b64).length;
+                    var gzSize = gzBytes < 1024 ? gzBytes + ' B' : (gzBytes / 1024).toFixed(1) + ' KB';
+                    statLine += ' → gzip后 ' + gzSize;
+                }
+                statusEl.innerHTML = statLine + '<br>' + infoLine;
 
                 // rAF + 时间戳调度
                 var frameDuration = 1000 / fps;
@@ -667,12 +676,12 @@
                     if (fountain) {
                         var e = fountainEmit(sendChunks, total, v);
                         payload = packFrame(sid, flag, e.seed, total, size, crc, e.data);
-                        statusEl.textContent = infoLine + ' | 播第 ' + (v + 1) + ' 帧';
+                        statusEl.innerHTML = statLine + '<br>' + infoLine + ' | 播第 ' + (v + 1) + ' 帧';
                     } else {
                         var idx = frameIndexAt(v);
                         payload = packFrame(sid, flag, idx, total, size, crc, chunks[idx]);
                         var dirText = direction === 1 ? '正向' : '反向';
-                        statusEl.textContent = infoLine + ' | ' + dirText + ' 第 ' + (idx + 1) + ' / ' + total + ' 页';
+                        statusEl.innerHTML = statLine + '<br>' + infoLine + ' | ' + dirText + ' 第 ' + (idx + 1) + ' / ' + total + ' 页';
                         direction = (frameIndexAt(v + 1) >= idx) ? 1 : -1;
                     }
                     qrEncoder.clear();
@@ -713,20 +722,22 @@
 
         // ==================== 接收端 ====================
 
-        var SCAN_MAX_EDGE = 720;
+        var SCAN_MAX_EDGE = 480;
         var isReceiving = false;
         var videoStream = null;
         var receiveAnimationId = null;
         var scanBusy = false;
-        var statusCounter = 0;
         var session = null;
 
         function newSession(sid, flag, total, size, crc) {
+            var missingSet = {};
+            for (var i = 0; i < total; i++) missingSet[i] = true;
             return {
                 sid: sid, flag: flag, total: total, size: size, crc: crc,
                 fountain: flag >= 2,
                 decoder: flag >= 2 ? new FountainDecoder(total) : null,
                 received: {},
+                missingSet: missingSet,
                 nextSid: null,
                 nextSidCount: 0
             };
@@ -824,6 +835,7 @@
                     if (f.seed >= session.total) { resolve(); return; }
                     if (!session.received[f.seed]) {
                         session.received[f.seed] = f.payload;
+                        delete session.missingSet[f.seed];
                         gotCount = Object.keys(session.received).length;
                         total = session.total;
                         updateProgress(gotCount, total, '⚡ 全速接收: ' + gotCount + ' / ' + total);
@@ -839,15 +851,13 @@
             document.getElementById('progress-fill').style.width = pct + '%';
             var statusEl = document.getElementById('receive-status');
             statusEl.innerHTML = text;
-            // 接近完成时提示缺失分片
+            // 接近完成时提示缺失分片（仅在缺失列表变化时更新，避免每帧重绘）
             if (!session.fountain && total - got > 0 && total - got <= 10) {
-                statusCounter++;
-                if (statusCounter % 10 === 1) {
-                    var missing = [];
-                    for (var i = 0; i < total; i++) if (!session.received[i]) missing.push(i + 1);
-                    if (missing.length) {
-                        statusEl.innerHTML = text + '<br><span class="sub">等待分片: ' + missing.join(', ') + '</span>';
-                    }
+                var missing = Object.keys(session.missingSet).map(Number);
+                var missingKey = missing.join(',');
+                if (missing.length && missingKey !== session.lastMissingKey) {
+                    session.lastMissingKey = missingKey;
+                    statusEl.innerHTML = text + '<br><span class="sub">缺失页: [' + missingKey + ']</span>';
                 }
             }
         }
